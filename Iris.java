@@ -389,7 +389,10 @@ class Iris {
             try {
                 String query = obj.getString("query");
                 List<Object> bindValues = jsonArrayToList(obj.getJSONArray("bind"));
-                String[] bindArgs = bindValues.toArray(new String[0]);
+                String[] bindArgs = new String[bindValues.size()]; // Create String array of the correct size
+                for (int i = 0; i < bindValues.size(); i++) {
+                    bindArgs[i] = String.valueOf(bindValues.get(i)); // Convert each element to String
+                }
                 List<Map<String, Object>> queryResult = executeQuery(query, bindArgs);
                 return createQuerySuccessResponse(queryResult);
             } catch (JSONException | ClassCastException e) {
