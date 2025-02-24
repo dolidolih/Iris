@@ -13,6 +13,7 @@ import android.app.RemoteInput;
 import android.os.Bundle;
 import org.json.JSONObject;
 import org.json.JSONException;
+import org.json.JSONArray;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -387,9 +388,11 @@ class Iris {
         private String handleQueryFunction(JSONObject obj) {
             try {
                 String query = obj.getString("query");
-                List<Map<String, Object>> queryResult = executeQuery(query);
+                List<Object> bindValues = jsonArrayToList(obj.getJSONArray("bind"));
+                String[] bindArgs = bindValues.toArray(new String[0]);
+                List<Map<String, Object>> queryResult = executeQuery(query, bindArgs);
                 return createQuerySuccessResponse(queryResult);
-            } catch (JSONException e) {
+            } catch (JSONException | ClassCastException e) {
                 return createErrorResponse("Missing 'query' field for query function.");
             } catch (SQLiteException e) {
                 return createErrorResponse("Database query error: " + e.toString());
@@ -415,11 +418,22 @@ class Iris {
             }
         }
 
-        private List<Map<String, Object>> executeQuery(String sqlQuery) {
+        private List<Object> jsonArrayToList(org.json.JSONArray jsonArray) throws JSONException {
+            List<Object> list = new ArrayList<>();
+            if (jsonArray != null) {
+                for (int i = 0; i < jsonArray.length(); i++) {
+                    list.add(jsonArray.get(i));
+                }
+            }
+            return list;
+        }
+
+
+        private List<Map<String, Object>> executeQuery(String sqlQuery, String[] bindArgs) {
             List<Map<String, Object>> resultList = new ArrayList<>();
             Cursor cursor = null;
             try {
-                cursor = kakaoDb.getConnection().rawQuery(sqlQuery, null);
+                cursor = kakaoDb.getConnection().rawQuery(sqlQuery, bindArgs);
                 if (cursor != null) {
                     String[] columnNames = cursor.getColumnNames();
                     while (cursor.moveToNext()) {
@@ -439,7 +453,6 @@ class Iris {
             return resultList;
         }
 
-
         private String createSuccessResponse() {
             try {
                 JSONObject responseJson = new JSONObject();
@@ -454,7 +467,12 @@ class Iris {
             try {
                 JSONObject responseJson = new JSONObject();
                 responseJson.put("success", true);
-                responseJson.put("data", queryResult);
+                JSONArray dataArray = new JSONArray();
+                for (Map<String, Object> rowMap : queryResult) {
+                    JSONObject rowJson = new JSONObject(rowMap); // Convert each Map to JSONObject
+                    dataArray.put(rowJson); // Add each JSONObject to JSONArray
+                }
+                responseJson.put("data", dataArray); // Put the JSONArray into the response
                 return responseJson.toString();
             } catch (JSONException e) {
                 return "{\"success\":false, \"error\":\"Failed to create query success JSON response.\"}";
