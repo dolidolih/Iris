@@ -1,4 +1,4 @@
-# SendMsgDB - An Android native db observer / message broker / reply sender for Kakaotalk bot
+# Iris - An Android native db observer / message broker / reply sender for Kakaotalk bot
 
 This project allows you to automate interactions with KakaoTalk, extract data from its database, and control it remotely via an HTTP server. It's built in Java and designed to run on Android devices, leveraging system services and direct database access.
 
@@ -23,20 +23,17 @@ This project allows you to automate interactions with KakaoTalk, extract data fr
     *   Control your KakaoTalk instance programmatically from other applications or scripts.
 *   **Configuration via JSON:**
     *   Configuration settings (like bot ID, bot name, server port, and web server endpoint) are loaded from a `config.json` file.
-
-**Work in Progress (WIP):**
-
-*   Decrypt all values when sending a database record to a web server (currently only message content is decrypted).
-*   Implement socket-based remote SQL query functionality (currently using HTTP).
+*   **Decryption via HTTP:**
+    *   Decrypt all values when sending a database record to a web server (currently only message content is decrypted).
 
 ## Getting Started
 
 ### Prerequisites
 
 *   **Android Device:** This application is designed to run on an Android device where KakaoTalk is installed and you have the necessary permissions to access system services and application data.
-*   **Root Access (Potentially):** Accessing KakaoTalk's database and some system services might require root access on your Android device, depending on your Android version and security settings.
-*   **Android SDK:** You will need the Android SDK set up to compile and deploy this application.
+*   **Root Access:** Accessing KakaoTalk's database and some system services might require root access on your Android device, depending on your Android version and security settings.
 *   **`config.json`:**  A `config.json` file needs to be placed in `/data/local/tmp/` on your Android device.
+*   **HTTP Server:** An HTTP server is required to interact with Iris.
 
 ### Setup
 
@@ -62,14 +59,18 @@ This project allows you to automate interactions with KakaoTalk, extract data fr
     *   `bot_http_port`: The port number for the HTTP server to listen on (e.g., `8080`).
     *   `web_server_endpoint`: The URL of your web server that will receive new KakaoTalk messages (e.g., `http://your-server.com/messages`).
 
-3.  **Compile the Java code:**
-    Use an Android development environment (like Android Studio or command-line tools) to compile the `SendMsgDB.java` file into an APK. You might need to adjust the build configuration depending on your environment.
+3.  **Copy files:**
+    Use adb to copy files into your Android environment.
+    ```bash
+    adb push Iris.dex /data/local/tmp
+    adb push config.json /data/local/tmp
+    ```
 
-4.  **Deploy to Android Device:**
-    Install the compiled APK on your Android device. You might need to enable "Install from Unknown Sources" in your device settings.
-
-5.  **Run the Application:**
-    Execute the `SendMsgDB` application on your Android device. It will start the HTTP server and begin monitoring the KakaoTalk database.
+4.  **Run the dex file:**
+    ```bash
+    adb shell su root sh -c 'CLASSPATH=/data/local/tmp/Iris.dex /system/bin/app_process / Iris'
+    ```
+    Use `&` for running as a service
 
 ### Usage
 
@@ -164,18 +165,10 @@ The HTTP server listens on the port specified in your `config.json` (`bot_http_p
     }
     ```
 
-### Important Notes
-
-*   **Security:** This project involves accessing and decrypting private data from the KakaoTalk database. Ensure you understand the security implications and use this tool responsibly.
-*   **Permissions:**  Granting necessary permissions to the application on your Android device is crucial for it to function correctly.
-*   **Database Schema Changes:** KakaoTalk database schema can change with updates. This project might require updates to remain compatible with newer versions of KakaoTalk.
-*   **Terms of Service:** Be aware of KakaoTalk's Terms of Service. Automating interactions might be against their terms, and usage is at your own risk.
-*   **Error Handling:** Check the application logs and HTTP response codes for error information if something is not working as expected.
-
 ## Credits
 
 *   **SendMsg & Initial Concept:** Based on the work of `ye-seola/go-kdb`.
-*   **KakaoTalk Decryption Logic:** Inspired by and utilizes decryption methods from `jiru/kakaodecrypt`.
+*   **KakaoTalk Decryption Logic:** Decryption methods from `jiru/kakaodecrypt`.
 
 ## Disclaimer
 
