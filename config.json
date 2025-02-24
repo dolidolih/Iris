@@ -1,0 +1,6 @@
+{
+    "bot_name" : YOUR_BOT_NAME_TO_SET_THE_SENDER_OF_YOUR_BOT_MESSAGE_RECORD,
+    "bot_id" : YOUR_BOT_ID,
+    "bot_http_port" : YOUR_BOT_LISTENING_PORT,
+    "web_server_endpoint" : "YOUR_WEBSERVER_LISTENING_ENDPOINT eg: http://172.17.0.1:5001/db"
+}
