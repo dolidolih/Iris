@@ -251,6 +251,8 @@ class Iris {
 
     static class HttpServer {
         private final KakaoDB kakaoDb;
+        private static final String NOTI_REF = Iris.NOTI_REF;
+
 
         public HttpServer(KakaoDB kakaoDb) {
             this.kakaoDb = kakaoDb;
@@ -387,13 +389,35 @@ class Iris {
 
         private String handleQueryFunction(JSONObject obj) {
             try {
-                String query = obj.getString("query");
-                List<Object> bindValues = jsonArrayToList(obj.getJSONArray("bind"));
-                String[] bindArgs = bindValues.toArray(new String[0]);
-                List<Map<String, Object>> queryResult = executeQuery(query, bindArgs);
-                return createQuerySuccessResponse(queryResult);
+                if (obj.has("queries")) {
+                    JSONArray queriesArray = obj.getJSONArray("queries");
+                    List<List<Map<String, Object>>> bulkResults = new ArrayList<>();
+                    for (int i = 0; i < queriesArray.length(); i++) {
+                        JSONObject queryObj = queriesArray.getJSONObject(i);
+                        String query = queryObj.getString("query");
+                        List<Object> bindValues = jsonArrayToList(queryObj.getJSONArray("bind"));
+                        String[] bindArgs = new String[bindValues.size()];
+                        for (int j = 0; j < bindValues.size(); j++) {
+                            bindArgs[j] = String.valueOf(bindValues.get(j));
+                        }
+                        List<Map<String, Object>> queryResult = executeQuery(query, bindArgs);
+                        bulkResults.add(queryResult);
+                    }
+                    return createQuerySuccessResponse(bulkResults);
+
+                } else {
+                    String query = obj.getString("query");
+                    List<Object> bindValues = jsonArrayToList(obj.getJSONArray("bind"));
+                    String[] bindArgs = new String[bindValues.size()];
+                    for (int i = 0; i < bindValues.size(); i++) {
+                        bindArgs[i] = String.valueOf(bindValues.get(i));
+                    }
+                    List<Map<String, Object>> queryResult = executeQuery(query, bindArgs);
+                    return createQuerySuccessResponse(queryResult);
+                }
+
             } catch (JSONException | ClassCastException e) {
-                return createErrorResponse("Missing 'query' field for query function.");
+                return createErrorResponse("Invalid 'query' or 'queries' field for query function. " + e.toString());
             } catch (SQLiteException e) {
                 return createErrorResponse("Database query error: " + e.toString());
             } catch (Exception e) {
@@ -463,16 +487,36 @@ class Iris {
             }
         }
 
-        private String createQuerySuccessResponse(List<Map<String, Object>> queryResult) {
+        // Modified to handle both single query result and bulk query results
+        private String createQuerySuccessResponse(Object queryResult) {
             try {
                 JSONObject responseJson = new JSONObject();
                 responseJson.put("success", true);
                 JSONArray dataArray = new JSONArray();
-                for (Map<String, Object> rowMap : queryResult) {
-                    JSONObject rowJson = new JSONObject(rowMap); // Convert each Map to JSONObject
-                    dataArray.put(rowJson); // Add each JSONObject to JSONArray
+
+                if (queryResult instanceof List) {
+                    List<?> resultList = (List<?>) queryResult;
+                    if (!resultList.isEmpty() && resultList.get(0) instanceof List) {
+                        // Handle bulk query results (List of List<Map<String, Object>>)
+                        List<List<Map<String, Object>>> bulkResults = (List<List<Map<String, Object>>>) queryResult;
+                        for (List<Map<String, Object>> singleQueryResult : bulkResults) {
+                            JSONArray singleQueryDataArray = new JSONArray();
+                            for (Map<String, Object> rowMap : singleQueryResult) {
+                                JSONObject rowJson = new JSONObject(rowMap);
+                                singleQueryDataArray.put(rowJson);
+                            }
+                            dataArray.put(singleQueryDataArray); // Add each query's result array
+                        }
+                    } else {
+                        // Handle single query result (List<Map<String, Object>>)
+                        List<Map<String, Object>> singleQueryResult = (List<Map<String, Object>>) queryResult;
+                        for (Map<String, Object> rowMap : singleQueryResult) {
+                            JSONObject rowJson = new JSONObject(rowMap);
+                            dataArray.put(rowJson);
+                        }
+                    }
                 }
-                responseJson.put("data", dataArray); // Put the JSONArray into the response
+                responseJson.put("data", dataArray);
                 return responseJson.toString();
             } catch (JSONException e) {
                 return "{\"success\":false, \"error\":\"Failed to create query success JSON response.\"}";
