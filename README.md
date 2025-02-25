@@ -3,6 +3,7 @@
 This project allows you to automate interactions with KakaoTalk, extract data from its database, and control it remotely via an HTTP server. It's built in Java and designed to run on Android devices, leveraging system services and direct database access.
 
 **Project Status:** Work in Progress (WIP)
+* [task-01] Encrypted message should be decrypted when returning query results.
 
 ## Features
 
