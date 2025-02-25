@@ -3,8 +3,6 @@
 This project allows you to automate interactions with KakaoTalk, extract data from its database, and control it remotely via an HTTP server. It's built in Java and designed to run on Android devices, leveraging system services and direct database access.
 
 **Project Status:** Work in Progress (WIP)
-* [task-01] Encrypted message should be decrypted when returning query results.
-* [task-02] User_id for decryption will be used bot_id if not included or null.
 
 ## Features
 
@@ -107,14 +105,31 @@ The HTTP server listens on the port specified in your `config.json` (`bot_http_p
     curl -X POST -H "Content-Type: application/json" -d '{"type": "image", "room": "1234567890", "data": "[BASE64_ENCODED_IMAGE_DATA]"}' http://[YOUR_DEVICE_IP]:[bot_http_port]/reply
     ```
 
-*   **`/query`**: Execute an SQL query on the KakaoTalk database.
+*   **`/query`**: Execute an SQL query on the KakaoTalk database. This method automatically decrypts encrypted data fields.
 
     **Request Body (JSON):**
 
     ```json
+    // for single request
     {
-      "query": "[SQL_QUERY]" // SQL query string
+      "query": "[SQL_QUERY]",  // SQL query string
+      "bind": [] // bindings
     }
+
+    // for multiple request
+    {
+      "queries":[
+        {
+          "query": "[SQL_QUERY]",
+          "bind": []
+        },
+        {
+          "query": "[SQL_QUERY]",
+          "bind": []
+        }
+      ]
+    }
+   
     ```
 
     **Example:**
