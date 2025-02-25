@@ -4,6 +4,7 @@ This project allows you to automate interactions with KakaoTalk, extract data fr
 
 **Project Status:** Work in Progress (WIP)
 * [task-01] Encrypted message should be decrypted when returning query results.
+* [task-02] User_id for decryption will be used bot_id if not included or null.
 
 ## Features
 
