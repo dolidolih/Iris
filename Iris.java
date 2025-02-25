@@ -1,9 +1,3 @@
-//SendMsg : ye-seola/go-kdb
-//Kakaodecrypt : jiru/kakaodecrypt
-
-//WIP: Decrypt all values when sending a db record to a web server.
-//WIP: Socket based remote SQL Query
-
 import android.os.IBinder;
 import android.os.ServiceManager;
 import android.app.IActivityManager;
@@ -309,7 +303,7 @@ class Iris {
                 String contentType = null;
                 String line;
                 while ((line = in.readLine()) != null && !line.isEmpty()) {
-                    if (line.startsWith("Content-Type: ")) {
+                    if (line.toLowerCase().startsWith("content-type: ")) {
                         contentType = line.substring("Content-Type: ".length()).trim();
                     }
                 }
@@ -429,14 +423,12 @@ class Iris {
             try {
                 int enc = obj.getInt("enc");
                 String b64_ciphertext = obj.getString("b64_ciphertext");
-                long user_id = obj.getLong("user_id");
+                long user_id = obj.optLong("user_id", Configurable.getBotId());
                 String plain_text = Iris.KakaoDecrypt.decrypt(enc, b64_ciphertext, user_id);
                 JSONObject responseJson = new JSONObject();
                 responseJson.put("plain_text", plain_text);
                 return responseJson.toString();
 
-            } catch (JSONException e) {
-                return createErrorResponse("Invalid parameters for decrypt function: " + e.toString());
             } catch (Exception e) {
                 return createErrorResponse("Decryption error: " + e.toString());
             }
@@ -487,7 +479,6 @@ class Iris {
             }
         }
 
-        // Modified to handle both single query result and bulk query results
         private String createQuerySuccessResponse(Object queryResult) {
             try {
                 JSONObject responseJson = new JSONObject();
@@ -497,21 +488,21 @@ class Iris {
                 if (queryResult instanceof List) {
                     List<?> resultList = (List<?>) queryResult;
                     if (!resultList.isEmpty() && resultList.get(0) instanceof List) {
-                        // Handle bulk query results (List of List<Map<String, Object>>)
                         List<List<Map<String, Object>>> bulkResults = (List<List<Map<String, Object>>>) queryResult;
                         for (List<Map<String, Object>> singleQueryResult : bulkResults) {
                             JSONArray singleQueryDataArray = new JSONArray();
                             for (Map<String, Object> rowMap : singleQueryResult) {
                                 JSONObject rowJson = new JSONObject(rowMap);
+                                processDecryptionForResponse(rowJson);
                                 singleQueryDataArray.put(rowJson);
                             }
-                            dataArray.put(singleQueryDataArray); // Add each query's result array
+                            dataArray.put(singleQueryDataArray);
                         }
                     } else {
-                        // Handle single query result (List<Map<String, Object>>)
                         List<Map<String, Object>> singleQueryResult = (List<Map<String, Object>>) queryResult;
                         for (Map<String, Object> rowMap : singleQueryResult) {
                             JSONObject rowJson = new JSONObject(rowMap);
+                            processDecryptionForResponse(rowJson);
                             dataArray.put(rowJson);
                         }
                     }
@@ -520,6 +511,60 @@ class Iris {
                 return responseJson.toString();
             } catch (JSONException e) {
                 return "{\"success\":false, \"error\":\"Failed to create query success JSON response.\"}";
+            }
+        }
+
+        private void processDecryptionForResponse(JSONObject rowJson) {
+            try {
+                if (rowJson.has("message") || rowJson.has("attachment")) {
+                    String vStr = rowJson.optString("v");
+                    if (vStr != null && !vStr.isEmpty()) {
+                        try {
+                            JSONObject vJson = new JSONObject(vStr);
+                            int enc = vJson.optInt("enc", 0);
+                            long userId = rowJson.optLong("user_id", Configurable.getBotId());
+                            if (rowJson.has("message")) {
+                                String encryptedMessage = rowJson.getString("message");
+                                rowJson.put("message", Iris.KakaoDecrypt.decrypt(enc, encryptedMessage, userId));
+                            }
+                            if (rowJson.has("attachment")) {
+                                String encryptedAttachment = rowJson.getString("attachment");
+                                rowJson.put("attachment", Iris.KakaoDecrypt.decrypt(enc, encryptedAttachment, userId));
+                            }
+                        } catch (JSONException e) {
+                            System.err.println("Error parsing 'v' for decryption: " + e.toString());
+                        } catch (Exception e) {
+                            System.err.println("Decryption error for message/attachment: " + e.toString());
+                        }
+                    }
+                }
+
+                long botId = Configurable.getBotId();
+                int enc = rowJson.optInt("enc", 0);
+                if (rowJson.has("nickname")) {
+                    try {
+                        String encryptedNickname = rowJson.getString("nickname");
+                        rowJson.put("nickname", Iris.KakaoDecrypt.decrypt(enc, encryptedNickname, botId));
+                    } catch (Exception e) {
+                        System.err.println("Decryption error for nickname: " + e.toString());
+                    }
+                }
+                String[] urlKeys = {"profile_image_url", "full_profile_image_url", "original_profile_image_url"};
+                for (String urlKey : urlKeys) {
+                    if (rowJson.has(urlKey)) {
+                        String encryptedUrl = rowJson.optString(urlKey, null);
+                        if (encryptedUrl != null) {
+                            try {
+                                rowJson.put(urlKey, Iris.KakaoDecrypt.decrypt(enc, encryptedUrl, botId));
+                            } catch (Exception e) {
+                                System.err.println("Decryption error for " + urlKey + ": " + e.toString());
+                            }
+                        }
+                    }
+                }
+
+            } catch (Exception e) {
+                System.err.println("JSON processing error during decryption: " + e.toString());
             }
         }
 
@@ -1065,6 +1110,7 @@ class Iris {
 
 
                         String enc_msg = res.getString(res.getColumnIndexOrThrow("message"));
+                        String enc_attachment = res.getString(res.getColumnIndexOrThrow("attachment"));
                         long user_id = res.getLong(res.getColumnIndexOrThrow("user_id"));
                         int encType = 0;
                         try {
@@ -1077,12 +1123,20 @@ class Iris {
 
 
                         String dec_msg;
+                        String dec_attachment = null;
                         try {
                             dec_msg = Iris.KakaoDecrypt.decrypt(encType, enc_msg, user_id);
+                            logJson.put("message", dec_msg);
+                            if (enc_attachment != null) {
+                                dec_attachment = Iris.KakaoDecrypt.decrypt(encType, enc_attachment, user_id);
+                                logJson.put("attachment", dec_attachment);
+                            }
                         } catch (Exception e) {
                             System.err.println("Decryption error for logId " + currentLogId + ": " + e.toString());
-                            dec_msg = "[Decryption Failed]";
+                            dec_msg = enc_msg;
+                            dec_attachment = enc_attachment;
                         }
+                        
                         long chat_id = res.getLong(res.getColumnIndexOrThrow("chat_id"));
                         String[] userInfo = db.getUserInfo(chat_id, user_id);
                         String room = userInfo[0];
