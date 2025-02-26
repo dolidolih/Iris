@@ -43,7 +43,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.io.OutputStream;
 
-import android.os.FileObserver;
+//import android.os.FileObserver; // Removed FileObserver import
 
 class Iris {
 
@@ -52,10 +52,9 @@ class Iris {
     private static final String NOTI_REF;
     private static final String CONFIG_FILE_PATH = "/data/local/tmp/config.json";
     private static final String DB_PATH = "/data/data/com.kakao.talk/databases";
-    private static String WATCH_FILE;
-    private static long lastModifiedTime = 0;
-    private static DBFileObserver dbFileObserver; // FileObserver instance
-
+    //private static String WATCH_FILE; // Removed WATCH_FILE
+    //private static long lastModifiedTime = 0; // Removed lastModifiedTime
+    //private static DBFileObserver dbFileObserver; // Removed dbFileObserver
 
     static {
         String notiRefValue = null;
@@ -92,7 +91,7 @@ class Iris {
         }
         NOTI_REF = (notiRefValue != null) ? notiRefValue : "default_noti_ref";
 
-        WATCH_FILE = DB_PATH + "/KakaoTalk.db-wal";
+        //WATCH_FILE = DB_PATH + "/KakaoTalk.db-wal"; // Removed WATCH_FILE initialization
     }
 
     public static void main(String[] args) {
@@ -101,45 +100,26 @@ class Iris {
         Iris.ObserverHelper observerHelper = new Iris.ObserverHelper();
         HttpServer httpServer = new HttpServer(kakaoDb);
 
-        dbFileObserver = new DBFileObserver(WATCH_FILE, FileObserver.MODIFY, kakaoDb, observerHelper);
-        dbFileObserver.startWatching();
-        System.out.println("FileObserver started watching: " + WATCH_FILE);
+        long pollingInterval = Configurable.getDbPollingRate();
+        System.out.println("Starting DB polling with interval: " + pollingInterval + "ms");
+        new Thread(() -> {
+            while (true) {
+                observerHelper.checkChange(kakaoDb);
+                try {
+                    Thread.sleep(pollingInterval);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    System.err.println("Polling thread interrupted: " + e.toString());
+                    break;
+                }
+            }
+        }).start();
 
 
         httpServer.startServer();
 
-        dbFileObserver.stopWatching();
-        System.out.println("FileObserver stopped watching: " + WATCH_FILE);
-
         kakaoDb.closeConnection();
     }
-
-    static class DBFileObserver extends FileObserver {
-        private final Iris.KakaoDB kakaoDb;
-        private final Iris.ObserverHelper observerHelper;
-        private long lastModifiedTimeObserver = 0;
-
-        public DBFileObserver(String path, int mask, Iris.KakaoDB kakaoDb, Iris.ObserverHelper observerHelper) {
-            super(path, mask);
-            this.kakaoDb = kakaoDb;
-            this.observerHelper = observerHelper;
-        }
-
-        @Override
-        public void onEvent(int event, String path) {
-            if (event == FileObserver.MODIFY) {
-                File watchFile = new File(WATCH_FILE);
-                long currentModifiedTime = watchFile.lastModified();
-
-                if (currentModifiedTime > lastModifiedTimeObserver) {
-                    lastModifiedTimeObserver = currentModifiedTime;
-                    System.out.println("Database file changed detected by FileObserver at: " + new java.util.Date(currentModifiedTime));
-                    observerHelper.checkChange(kakaoDb, WATCH_FILE);
-                }
-            }
-        }
-    }
-
 
     static class Replier {
         private static IBinder binder = ServiceManager.getService("activity");
@@ -624,6 +604,7 @@ class Iris {
         private static String BOT_NAME_CONFIG;
         private static int BOT_HTTP_PORT_CONFIG;
         private static String WEB_SERVER_ENDPOINT_CONFIG;
+        private static long DB_POLLING_RATE_CONFIG = 100;
 
         public static void loadConfig(String configFile) {
             StringBuilder sb = new StringBuilder();
@@ -641,6 +622,9 @@ class Iris {
                 BOT_NAME_CONFIG = config.getString("bot_name");
                 BOT_HTTP_PORT_CONFIG = config.getInt("bot_http_port");
                 WEB_SERVER_ENDPOINT_CONFIG = config.getString("web_server_endpoint");
+                if (config.has("db_polling_rate")) {
+                    DB_POLLING_RATE_CONFIG = config.getLong("db_polling_rate");
+                }
             } catch (JSONException e) {
                 System.err.println("JSON parsing error in config.json: " + e.toString());
             }
@@ -650,6 +634,7 @@ class Iris {
         public static String getBotName() { return BOT_NAME_CONFIG; }
         public static int getBotSocketPort() { return BOT_HTTP_PORT_CONFIG; }
         public static String getWebServerEndpoint() { return WEB_SERVER_ENDPOINT_CONFIG; }
+        public static long getDbPollingRate() { return DB_POLLING_RATE_CONFIG; }
     }
 
     static class KakaoDecrypt extends Configurable {
@@ -1085,7 +1070,7 @@ class Iris {
             return data.toString();
         }
 
-        public void checkChange(Iris.KakaoDB db, String watchFile) {
+        public void checkChange(Iris.KakaoDB db) { // Removed watchFile parameter
             if (lastLogId == 0) {
                 Map<String, Object> lastLog = db.logToDict(0);
                 if (lastLog != null && lastLog.containsKey("_id")) {
@@ -1097,90 +1082,111 @@ class Iris {
                 return;
             }
 
-            String sql = "select * from chat_logs where _id > ? order by _id asc";
-            Cursor res = null;
+            String countSql = "select count(*) from chat_logs where _id > ?";
+            Cursor countRes = null;
+            int newLogCount = 0;
             try {
-                String[] selectionArgs = {String.valueOf(lastLogId)};
-                res = db.getConnection().rawQuery(sql, selectionArgs);
-                List<String> description = new ArrayList<>();
-                if (res.getColumnNames() != null) {
-                    for (String columnName : res.getColumnNames()) {
-                        description.add(columnName);
-                    }
-                }
-
-
-                while (res != null && res.moveToNext()) {
-                    long currentLogId = res.getLong(res.getColumnIndexOrThrow("_id"));
-                    if (currentLogId > lastLogId) {
-                        lastLogId = currentLogId;
-                        JSONObject logJson = new JSONObject();
-                        for (String columnName : description) {
-                            try {
-                                logJson.put(columnName, res.getString(res.getColumnIndexOrThrow(columnName)));
-                            } catch (JSONException e) {
-                                System.err.println("JSONException while adding log data to JSON object: " + e.getMessage());
-                                continue;
-                            }
-                        }
-
-
-                        String enc_msg = res.getString(res.getColumnIndexOrThrow("message"));
-                        String enc_attachment = res.getString(res.getColumnIndexOrThrow("attachment"));
-                        long user_id = res.getLong(res.getColumnIndexOrThrow("user_id"));
-                        int encType = 0;
-                        try {
-                            JSONObject v = new JSONObject(res.getString(res.getColumnIndexOrThrow("v")));
-                            encType = v.getInt("enc");
-                        } catch (JSONException e) {
-                            System.err.println("Error parsing 'v' JSON for encType: " + e.getMessage());
-                            encType = 0;
-                        }
-
-
-                        String dec_msg;
-                        String dec_attachment = null;
-                        try {
-                            if (enc_msg == null || enc_msg.isEmpty() || enc_msg.equals("{}")){
-                                dec_msg = "{}}";
-                            } else {
-                                dec_msg = Iris.KakaoDecrypt.decrypt(encType, enc_msg, user_id);
-                                logJson.put("message", dec_msg);
-                            }
-                            if (enc_attachment == null || enc_attachment.isEmpty() || enc_attachment.equals("{}") || res.getColumnIndexOrThrow("attachment") == -1){
-                                dec_attachment = "{}";
-                            } else {
-                                dec_attachment = Iris.KakaoDecrypt.decrypt(encType, enc_attachment, user_id);
-                            }
-                            logJson.put("attachment", dec_attachment);
-                        } catch (Exception e) {
-                            System.err.println("Decryption error for logId " + currentLogId + ": " + e.toString());
-                            dec_msg = enc_msg;
-                            dec_attachment = enc_attachment;
-                        }
-
-                        long chat_id = res.getLong(res.getColumnIndexOrThrow("chat_id"));
-                        String[] userInfo = db.getUserInfo(chat_id, user_id);
-                        String room = userInfo[0];
-                        String sender = userInfo[1];
-                        if (room.equals(BOT_NAME)) {
-                            room = sender;
-                        }
-                        String postData;
-                        try {
-                            postData = makePostData(dec_msg, room, sender, logJson);
-                            sendPostRequest(WEB_SERVER_ENDPOINT, postData);
-                        } catch (JSONException e) {
-                            System.err.println("JSON error creating post data: " + e.getMessage());
-                        }
-                        System.out.println("New message from " + sender + " in " + room + ": " + dec_msg);
-                    }
+                String[] selectionCountArgs = {String.valueOf(lastLogId)};
+                countRes = db.getConnection().rawQuery(countSql, selectionCountArgs);
+                if (countRes != null && countRes.moveToNext()) {
+                    newLogCount = countRes.getInt(0);
                 }
             } catch (SQLiteException e) {
-                System.err.println("SQL error in checkChange: " + e.getMessage());
+                System.err.println("SQL error in checkChange (count query): " + e.getMessage());
             } finally {
-                if (res != null) {
-                    res.close();
+                if (countRes != null) {
+                    countRes.close();
+                }
+            }
+
+            if (newLogCount > 0) {
+                System.out.println("Detected " + newLogCount + " new log(s). Processing...");
+                String sql = "select * from chat_logs where _id > ? order by _id asc";
+                Cursor res = null;
+                try {
+                    String[] selectionArgs = {String.valueOf(lastLogId)};
+                    res = db.getConnection().rawQuery(sql, selectionArgs);
+                    List<String> description = new ArrayList<>();
+                    if (res.getColumnNames() != null) {
+                        for (String columnName : res.getColumnNames()) {
+                            description.add(columnName);
+                        }
+                    }
+
+
+                    while (res != null && res.moveToNext()) {
+                        long currentLogId = res.getLong(res.getColumnIndexOrThrow("_id"));
+                        if (currentLogId > lastLogId) {
+                            lastLogId = currentLogId;
+                            JSONObject logJson = new JSONObject();
+                            for (String columnName : description) {
+                                try {
+                                    logJson.put(columnName, res.getString(res.getColumnIndexOrThrow(columnName)));
+                                } catch (JSONException e) {
+                                    System.err.println("JSONException while adding log data to JSON object: " + e.getMessage());
+                                    continue;
+                                }
+                            }
+
+
+                            String enc_msg = res.getString(res.getColumnIndexOrThrow("message"));
+                            String enc_attachment = res.getString(res.getColumnIndexOrThrow("attachment"));
+                            long user_id = res.getLong(res.getColumnIndexOrThrow("user_id"));
+                            int encType = 0;
+                            try {
+                                JSONObject v = new JSONObject(res.getString(res.getColumnIndexOrThrow("v")));
+                                encType = v.getInt("enc");
+                            } catch (JSONException e) {
+                                System.err.println("Error parsing 'v' JSON for encType: " + e.getMessage());
+                                encType = 0;
+                            }
+
+
+                            String dec_msg;
+                            String dec_attachment = null;
+                            try {
+                                if (enc_msg == null || enc_msg.isEmpty() || enc_msg.equals("{}")){
+                                    dec_msg = "{}}";
+                                } else {
+                                    dec_msg = Iris.KakaoDecrypt.decrypt(encType, enc_msg, user_id);
+                                    logJson.put("message", dec_msg);
+                                }
+                                if (enc_attachment == null || enc_attachment.isEmpty() || enc_attachment.equals("{}") || res.getColumnIndexOrThrow("attachment") == -1){
+                                    dec_attachment = "{}";
+                                } else {
+                                    dec_attachment = Iris.KakaoDecrypt.decrypt(encType, enc_attachment, user_id);
+                                }
+                                logJson.put("attachment", dec_attachment);
+                            } catch (Exception e) {
+                                System.err.println("Decryption error for logId " + currentLogId + ": " + e.toString());
+                                dec_msg = enc_msg;
+                                dec_attachment = enc_attachment;
+                            }
+
+                            long chat_id = res.getLong(res.getColumnIndexOrThrow("chat_id"));
+                            String[] userInfo = db.getUserInfo(chat_id, user_id);
+                            String room = userInfo[0];
+                            String sender = userInfo[1];
+                            if (room.equals(BOT_NAME)) {
+                                room = sender;
+                            }
+                            String postData;
+                            try {
+                                postData = makePostData(dec_msg, room, sender, logJson);
+                                sendPostRequest(WEB_SERVER_ENDPOINT, postData);
+                            } catch (JSONException e) {
+                                System.err.println("JSON error creating post data: " + e.getMessage());
+                            }
+                            System.out.println("New message from " + sender + " in " + room + ": " + dec_msg);
+
+                        }
+                    }
+                } catch (SQLiteException e) {
+                    System.err.println("SQL error in checkChange (data query): " + e.getMessage());
+                } finally {
+                    if (res != null) {
+                        res.close();
+                    }
                 }
             }
         }
