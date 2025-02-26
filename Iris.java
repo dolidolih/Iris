@@ -96,7 +96,8 @@ class Iris {
 
     public static void main(String[] args) {
         Configurable.loadConfig(CONFIG_FILE_PATH);
-        Iris.KakaoDB kakaoDb = new Iris.KakaoDB();
+        KakaoDB kakaoDb = new KakaoDB(); // KakaoDB instance created first to fetch botId
+        Configurable.setBotId(kakaoDb.BOT_ID); // Dynamically set botId after KakaoDB is initialized
         Iris.ObserverHelper observerHelper = new Iris.ObserverHelper();
         HttpServer httpServer = new HttpServer(kakaoDb);
 
@@ -600,7 +601,7 @@ class Iris {
 
     static class Configurable {
         private static JSONObject config;
-        private static long BOT_ID_CONFIG;
+        private static long BOT_ID_CONFIG; // Removed static initialization and usage, will be dynamically set
         private static String BOT_NAME_CONFIG;
         private static int BOT_HTTP_PORT_CONFIG;
         private static String WEB_SERVER_ENDPOINT_CONFIG;
@@ -618,7 +619,7 @@ class Iris {
             }
             try {
                 config = new JSONObject(sb.toString());
-                BOT_ID_CONFIG = config.getLong("bot_id");
+                // BOT_ID_CONFIG = config.getLong("bot_id"); // Removed bot_id loading from config
                 BOT_NAME_CONFIG = config.getString("bot_name");
                 BOT_HTTP_PORT_CONFIG = config.getInt("bot_http_port");
                 WEB_SERVER_ENDPOINT_CONFIG = config.getString("web_server_endpoint");
@@ -630,7 +631,9 @@ class Iris {
             }
         }
 
-        public static long getBotId() { return BOT_ID_CONFIG; }
+        // public static long getBotId() { return BOT_ID_CONFIG; } // Removed static bot_id getter
+        public static long getBotId() { return KakaoDecrypt.BOT_USER_ID; } // Get botId from KakaoDecrypt which now uses Configurable.setBotId
+        public static void setBotId(long botId) { KakaoDecrypt.BOT_USER_ID = botId; } // Setter for dynamically setting botId
         public static String getBotName() { return BOT_NAME_CONFIG; }
         public static int getBotSocketPort() { return BOT_HTTP_PORT_CONFIG; }
         public static String getWebServerEndpoint() { return WEB_SERVER_ENDPOINT_CONFIG; }
@@ -639,11 +642,12 @@ class Iris {
 
     static class KakaoDecrypt extends Configurable {
         private static final java.util.Map<String, byte[]> keyCache = new java.util.HashMap<>();
-        private static long BOT_USER_ID;
+        public static long BOT_USER_ID; // Made public static, and will be set dynamically by Configurable.setBotId
 
-        static {
-            BOT_USER_ID = Configurable.getBotId();
-        }
+        // static initializer removed as BOT_USER_ID will be set dynamically
+        // static {
+        //     BOT_USER_ID = Configurable.getBotId();
+        // }
 
 
         private static String incept(int n) {
@@ -843,18 +847,41 @@ class Iris {
 
 
         public KakaoDB() {
-            BOT_ID = Configurable.getBotId();
             BOT_NAME = Configurable.getBotName();
 
             try {
                 db = SQLiteDatabase.openDatabase(DB_PATH + "/KakaoTalk.db", null, SQLiteDatabase.OPEN_READWRITE);
                 db.execSQL("ATTACH DATABASE '" + DB_PATH + "/KakaoTalk2.db' AS db2");
+                this.BOT_ID = getBotUserIdFromDB(); // Fetch botId immediately after db connection
             } catch (SQLiteException e) {
                 System.err.println("SQLiteException: " + e.getMessage());
                 System.err.println("You don't have a permission to access KakaoTalk Database.");
                 System.exit(1);
             }
         }
+
+        public long getBotUserIdFromDB() {
+            long botUserId = -1; // Default value if not found
+            Cursor cursor = null;
+            try {
+                String sql = "SELECT user_id FROM chat_logs WHERE v LIKE '%\"isMine\":true%' LIMIT 1;";
+                cursor = db.rawQuery(sql, null);
+                if (cursor != null && cursor.moveToFirst()) {
+                    botUserId = cursor.getLong(0);
+                    System.out.println("Bot user_id is detected: " + botUserId);
+                } else {
+                    System.err.println("Warning: Bot user_id not found in chat_logs with isMine:true. Decryption might not work correctly.");
+                }
+            } catch (SQLiteException e) {
+                System.err.println("SQLiteException while fetching bot user_id: " + e.getMessage());
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
+            }
+            return botUserId;
+        }
+
 
         public List<String> getColumnInfo(String table) {
             List<String> cols = new ArrayList<>();
@@ -921,7 +948,7 @@ class Iris {
                 if (cursor != null && cursor.moveToNext()) {
                     String row_name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     String enc = cursor.getString(cursor.getColumnIndexOrThrow("enc"));
-                    dec_row_name = Iris.KakaoDecrypt.decrypt(Integer.parseInt(enc), row_name, KakaoDecrypt.BOT_USER_ID);
+                    dec_row_name = Iris.KakaoDecrypt.decrypt(Integer.parseInt(enc), row_name, Configurable.getBotId()); // Use Configurable.getBotId()
                 }
 
             } catch (SQLiteException e) {
@@ -941,7 +968,7 @@ class Iris {
 
         public String[] getUserInfo(long chatId, long userId) {
             String sender;
-            if (userId == BOT_ID) {
+            if (userId == Configurable.getBotId()) { // Use Configurable.getBotId()
                 sender = BOT_NAME;
             } else {
                 sender = getNameOfUserId(userId);
@@ -1118,6 +1145,22 @@ class Iris {
                         long currentLogId = res.getLong(res.getColumnIndexOrThrow("_id"));
                         if (currentLogId > lastLogId) {
                             lastLogId = currentLogId;
+                            int encType = 0;
+                            String origin = "";
+                            try {
+                                JSONObject v = new JSONObject(res.getString(res.getColumnIndexOrThrow("v")));
+                                encType = v.getInt("enc");
+                                origin = v.getString("origin");
+                            } catch (JSONException e) {
+                                System.err.println("Error parsing 'v' JSON for encType: " + e.getMessage());
+                                encType = 0;
+                            }
+                            
+                            if (origin.equals("SYNCMSG") || origin.equals("MCHATLOGS")){
+                                continue;
+                            }
+
+                            
                             JSONObject logJson = new JSONObject();
                             for (String columnName : description) {
                                 try {
@@ -1132,14 +1175,8 @@ class Iris {
                             String enc_msg = res.getString(res.getColumnIndexOrThrow("message"));
                             String enc_attachment = res.getString(res.getColumnIndexOrThrow("attachment"));
                             long user_id = res.getLong(res.getColumnIndexOrThrow("user_id"));
-                            int encType = 0;
-                            try {
-                                JSONObject v = new JSONObject(res.getString(res.getColumnIndexOrThrow("v")));
-                                encType = v.getInt("enc");
-                            } catch (JSONException e) {
-                                System.err.println("Error parsing 'v' JSON for encType: " + e.getMessage());
-                                encType = 0;
-                            }
+                            
+                            
 
 
                             String dec_msg;
