@@ -42,8 +42,9 @@ import android.database.sqlite.SQLiteException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.io.OutputStream;
-
-//import android.os.FileObserver; // Removed FileObserver import
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 class Iris {
 
@@ -52,9 +53,8 @@ class Iris {
     private static final String NOTI_REF;
     private static final String CONFIG_FILE_PATH = "/data/local/tmp/config.json";
     private static final String DB_PATH = "/data/data/com.kakao.talk/databases";
-    //private static String WATCH_FILE; // Removed WATCH_FILE
-    //private static long lastModifiedTime = 0; // Removed lastModifiedTime
-    //private static DBFileObserver dbFileObserver; // Removed dbFileObserver
+    private static final String IMAGE_DIR_PATH = "/sdcard/Android/data/com.kakao.talk/files";
+
 
     static {
         String notiRefValue = null;
@@ -90,16 +90,15 @@ class Iris {
             System.out.println("NotificationReferer loaded: " + notiRefValue);
         }
         NOTI_REF = (notiRefValue != null) ? notiRefValue : "default_noti_ref";
-
-        //WATCH_FILE = DB_PATH + "/KakaoTalk.db-wal"; // Removed WATCH_FILE initialization
     }
 
     public static void main(String[] args) {
         Configurable.loadConfig(CONFIG_FILE_PATH);
-        KakaoDB kakaoDb = new KakaoDB(); // KakaoDB instance created first to fetch botId
-        Configurable.setBotId(kakaoDb.BOT_ID); // Dynamically set botId after KakaoDB is initialized
+        KakaoDB kakaoDb = new KakaoDB();
+        Configurable.setBotId(kakaoDb.BOT_ID);
         Iris.ObserverHelper observerHelper = new Iris.ObserverHelper();
         HttpServer httpServer = new HttpServer(kakaoDb);
+        Replier.startMessageSender(); // Start message sender thread
 
         long pollingInterval = Configurable.getDbPollingRate();
         System.out.println("Starting DB polling with interval: " + pollingInterval + "ms");
@@ -116,18 +115,80 @@ class Iris {
             }
         }).start();
 
+        // Start image deletion thread
+        long deletionInterval = TimeUnit.HOURS.toMillis(1); // Run every hour
+        System.out.println("Starting image deletion thread, checking every 1 hour");
+        new Thread(() -> {
+            while (true) {
+                deleteOldImages();
+                try {
+                    Thread.sleep(deletionInterval);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    System.err.println("Image deletion thread interrupted: " + e.toString());
+                    break;
+                }
+            }
+        }).start();
+
 
         httpServer.startServer();
 
         kakaoDb.closeConnection();
     }
 
+    private static void deleteOldImages() {
+        File imageDir = new File(IMAGE_DIR_PATH);
+        if (!imageDir.exists() || !imageDir.isDirectory()) {
+            System.out.println("Image directory does not exist: " + IMAGE_DIR_PATH);
+            return;
+        }
+
+        long oneDayAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1);
+        File[] files = imageDir.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isFile() && file.lastModified() < oneDayAgo) {
+                    if (file.delete()) {
+                        System.out.println("Deleted old image file: " + file.getName());
+                    } else {
+                        System.err.println("Failed to delete image file: " + file.getName());
+                    }
+                }
+            }
+        }
+    }
+
     static class Replier {
         private static IBinder binder = ServiceManager.getService("activity");
         private static IActivityManager activityManager = IActivityManager.Stub.asInterface(binder);
         private static final String NOTI_REF = Iris.NOTI_REF;
+        private static final BlockingQueue<SendMessageRequest> messageQueue = new LinkedBlockingQueue<>();
+        private static long messageSendRate = Configurable.getMessageSendRate(); // Load from config
 
-        private static void SendMessage(String notiRef, Long chatId, String msg) throws Exception {
+        interface SendMessageRequest {
+            void send() throws Exception;
+        }
+
+        public static void startMessageSender() {
+            new Thread(() -> {
+                while (true) {
+                    try {
+                        SendMessageRequest request = messageQueue.take();
+                        request.send();
+                        Thread.sleep(messageSendRate); // Respect message send rate
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        System.err.println("Message sender thread interrupted: " + e.toString());
+                        break;
+                    } catch (Exception e) {
+                        System.err.println("Error sending message from queue: " + e.toString());
+                    }
+                }
+            }).start();
+        }
+
+        private static void SendMessageInternal(String notiRef, Long chatId, String msg) throws Exception {
             Intent intent = new Intent();
             intent.setComponent(new ComponentName("com.kakao.talk", "com.kakao.talk.notification.NotificationActionService"));
 
@@ -152,10 +213,15 @@ class Iris {
             );
         }
 
-        private static void SendPhoto(String room, String base64ImageDataString) throws Exception {
+        public static void SendMessage(String notiRef, Long chatId, String msg) {
+            messageQueue.offer(() -> SendMessageInternal(notiRef, chatId, msg));
+        }
+
+
+        private static void SendPhotoInternal(Long room, String base64ImageDataString) throws Exception {
             byte[] decodedImage = android.util.Base64.decode(base64ImageDataString, android.util.Base64.DEFAULT);
             String timestamp = String.valueOf(System.currentTimeMillis());
-            File picDir = new File("/sdcard/Android/data/com.kakao.talk/files");
+            File picDir = new File(IMAGE_DIR_PATH);
             if (!picDir.exists()) {
                 picDir.mkdirs();
             }
@@ -208,7 +274,7 @@ class Iris {
             intent.setAction(Intent.ACTION_SENDTO);
             intent.setType("image/png");
             intent.putExtra(Intent.EXTRA_STREAM, imageUri);
-            intent.putExtra("key_id", Long.parseLong(room));
+            intent.putExtra("key_id", room);
             intent.putExtra("key_type", 1);
             intent.putExtra("key_from_direct_share", true);
             intent.setPackage("com.kakao.talk");
@@ -229,6 +295,10 @@ class Iris {
                 System.err.println("Error starting activity for sending image: " + e.toString());
                 throw e;
             }
+        }
+
+        public static void SendPhoto(Long room, String base64ImageDataString) {
+            messageQueue.offer(() -> SendPhotoInternal(room, base64ImageDataString));
         }
     }
 
@@ -359,13 +429,12 @@ class Iris {
         private String handleReplyFunction(JSONObject obj) throws Exception {
             String type = obj.optString("type");
             String room = obj.getString("room");
-            Long chatId = Long.parseLong(room);
             String data = obj.getString("data");
 
             if ("image".equals(type)) {
-                Replier.SendPhoto(room, data);
+                Replier.SendPhoto(Long.parseLong(room), data);
             } else {
-                Replier.SendMessage(NOTI_REF, chatId, data);
+                Replier.SendMessage(NOTI_REF, Long.parseLong(room), data);
             }
             return createSuccessResponse();
         }
@@ -601,11 +670,12 @@ class Iris {
 
     static class Configurable {
         private static JSONObject config;
-        private static long BOT_ID_CONFIG; // Removed static initialization and usage, will be dynamically set
+        private static long BOT_ID_CONFIG;
         private static String BOT_NAME_CONFIG;
         private static int BOT_HTTP_PORT_CONFIG;
         private static String WEB_SERVER_ENDPOINT_CONFIG;
         private static long DB_POLLING_RATE_CONFIG = 100;
+        private static long MESSAGE_SEND_RATE_CONFIG = 50; // Default message send rate
 
         public static void loadConfig(String configFile) {
             StringBuilder sb = new StringBuilder();
@@ -619,36 +689,32 @@ class Iris {
             }
             try {
                 config = new JSONObject(sb.toString());
-                // BOT_ID_CONFIG = config.getLong("bot_id"); // Removed bot_id loading from config
                 BOT_NAME_CONFIG = config.getString("bot_name");
                 BOT_HTTP_PORT_CONFIG = config.getInt("bot_http_port");
                 WEB_SERVER_ENDPOINT_CONFIG = config.getString("web_server_endpoint");
                 if (config.has("db_polling_rate")) {
                     DB_POLLING_RATE_CONFIG = config.getLong("db_polling_rate");
                 }
+                if (config.has("message_send_rate")) {
+                    MESSAGE_SEND_RATE_CONFIG = config.getLong("message_send_rate");
+                }
             } catch (JSONException e) {
                 System.err.println("JSON parsing error in config.json: " + e.toString());
             }
         }
 
-        // public static long getBotId() { return BOT_ID_CONFIG; } // Removed static bot_id getter
-        public static long getBotId() { return KakaoDecrypt.BOT_USER_ID; } // Get botId from KakaoDecrypt which now uses Configurable.setBotId
-        public static void setBotId(long botId) { KakaoDecrypt.BOT_USER_ID = botId; } // Setter for dynamically setting botId
+        public static long getBotId() { return KakaoDecrypt.BOT_USER_ID; }
+        public static void setBotId(long botId) { KakaoDecrypt.BOT_USER_ID = botId; }
         public static String getBotName() { return BOT_NAME_CONFIG; }
         public static int getBotSocketPort() { return BOT_HTTP_PORT_CONFIG; }
         public static String getWebServerEndpoint() { return WEB_SERVER_ENDPOINT_CONFIG; }
         public static long getDbPollingRate() { return DB_POLLING_RATE_CONFIG; }
+        public static long getMessageSendRate() { return MESSAGE_SEND_RATE_CONFIG; } // Getter for message send rate
     }
 
     static class KakaoDecrypt extends Configurable {
         private static final java.util.Map<String, byte[]> keyCache = new java.util.HashMap<>();
-        public static long BOT_USER_ID; // Made public static, and will be set dynamically by Configurable.setBotId
-
-        // static initializer removed as BOT_USER_ID will be set dynamically
-        // static {
-        //     BOT_USER_ID = Configurable.getBotId();
-        // }
-
+        public static long BOT_USER_ID;
 
         private static String incept(int n) {
             String[] dict1 = {"adrp.ldrsh.ldnp", "ldpsw", "umax", "stnp.rsubhn", "sqdmlsl", "uqrshl.csel", "sqshlu", "umin.usubl.umlsl", "cbnz.adds", "tbnz",
@@ -852,7 +918,7 @@ class Iris {
             try {
                 db = SQLiteDatabase.openDatabase(DB_PATH + "/KakaoTalk.db", null, SQLiteDatabase.OPEN_READWRITE);
                 db.execSQL("ATTACH DATABASE '" + DB_PATH + "/KakaoTalk2.db' AS db2");
-                this.BOT_ID = getBotUserIdFromDB(); // Fetch botId immediately after db connection
+                this.BOT_ID = getBotUserIdFromDB();
             } catch (SQLiteException e) {
                 System.err.println("SQLiteException: " + e.getMessage());
                 System.err.println("You don't have a permission to access KakaoTalk Database.");
@@ -861,7 +927,7 @@ class Iris {
         }
 
         public long getBotUserIdFromDB() {
-            long botUserId = -1; // Default value if not found
+            long botUserId = -1;
             Cursor cursor = null;
             try {
                 String sql = "SELECT user_id FROM chat_logs WHERE v LIKE '%\"isMine\":true%' LIMIT 1;";
@@ -948,7 +1014,7 @@ class Iris {
                 if (cursor != null && cursor.moveToNext()) {
                     String row_name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     String enc = cursor.getString(cursor.getColumnIndexOrThrow("enc"));
-                    dec_row_name = Iris.KakaoDecrypt.decrypt(Integer.parseInt(enc), row_name, Configurable.getBotId()); // Use Configurable.getBotId()
+                    dec_row_name = Iris.KakaoDecrypt.decrypt(Integer.parseInt(enc), row_name, Configurable.getBotId());
                 }
 
             } catch (SQLiteException e) {
@@ -968,7 +1034,7 @@ class Iris {
 
         public String[] getUserInfo(long chatId, long userId) {
             String sender;
-            if (userId == Configurable.getBotId()) { // Use Configurable.getBotId()
+            if (userId == Configurable.getBotId()) {
                 sender = BOT_NAME;
             } else {
                 sender = getNameOfUserId(userId);
@@ -1097,7 +1163,7 @@ class Iris {
             return data.toString();
         }
 
-        public void checkChange(Iris.KakaoDB db) { // Removed watchFile parameter
+        public void checkChange(Iris.KakaoDB db) {
             if (lastLogId == 0) {
                 Map<String, Object> lastLog = db.logToDict(0);
                 if (lastLog != null && lastLog.containsKey("_id")) {
@@ -1155,12 +1221,12 @@ class Iris {
                                 System.err.println("Error parsing 'v' JSON for encType: " + e.getMessage());
                                 encType = 0;
                             }
-                            
+
                             if (origin.equals("SYNCMSG") || origin.equals("MCHATLOGS")){
                                 continue;
                             }
 
-                            
+
                             JSONObject logJson = new JSONObject();
                             for (String columnName : description) {
                                 try {
@@ -1175,8 +1241,7 @@ class Iris {
                             String enc_msg = res.getString(res.getColumnIndexOrThrow("message"));
                             String enc_attachment = res.getString(res.getColumnIndexOrThrow("attachment"));
                             long user_id = res.getLong(res.getColumnIndexOrThrow("user_id"));
-                            
-                            
+
 
 
                             String dec_msg;
