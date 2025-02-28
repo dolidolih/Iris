@@ -17,6 +17,10 @@ import java.util.Map;
 import java.util.Locale;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URLDecoder;
+import java.net.URISyntaxException;
+import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -45,6 +49,7 @@ import java.io.OutputStream;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.io.OutputStreamWriter;
 
 class Iris {
 
@@ -93,30 +98,18 @@ class Iris {
     }
 
     public static void main(String[] args) {
-        Configurable.loadConfig(CONFIG_FILE_PATH);
+        Configurable.getInstance().loadConfig(CONFIG_FILE_PATH);
         KakaoDB kakaoDb = new KakaoDB();
-        Configurable.setBotId(kakaoDb.BOT_ID);
+        Configurable.getInstance().setBotId(kakaoDb.BOT_ID);
         Iris.ObserverHelper observerHelper = new Iris.ObserverHelper();
         HttpServer httpServer = new HttpServer(kakaoDb);
-        Replier.startMessageSender(); // Start message sender thread
+        Replier.startMessageSender();
 
-        long pollingInterval = Configurable.getDbPollingRate();
-        System.out.println("Starting DB polling with interval: " + pollingInterval + "ms");
-        new Thread(() -> {
-            while (true) {
-                observerHelper.checkChange(kakaoDb);
-                try {
-                    Thread.sleep(pollingInterval);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    System.err.println("Polling thread interrupted: " + e.toString());
-                    break;
-                }
-            }
-        }).start();
+        DBObserver dbObserver = new DBObserver(kakaoDb, observerHelper);
+        dbObserver.startPolling();
+        System.out.println("Starting DB polling managed by DBObserver");
 
-        // Start image deletion thread
-        long deletionInterval = TimeUnit.HOURS.toMillis(1); // Run every hour
+        long deletionInterval = TimeUnit.HOURS.toMillis(1);
         System.out.println("Starting image deletion thread, checking every 1 hour");
         new Thread(() -> {
             while (true) {
@@ -164,7 +157,7 @@ class Iris {
         private static IActivityManager activityManager = IActivityManager.Stub.asInterface(binder);
         private static final String NOTI_REF = Iris.NOTI_REF;
         private static final BlockingQueue<SendMessageRequest> messageQueue = new LinkedBlockingQueue<>();
-        private static long messageSendRate = Configurable.getMessageSendRate(); // Load from config
+        private static long messageSendRate = Configurable.getInstance().getMessageSendRate();
 
         interface SendMessageRequest {
             void send() throws Exception;
@@ -176,7 +169,7 @@ class Iris {
                     try {
                         SendMessageRequest request = messageQueue.take();
                         request.send();
-                        Thread.sleep(messageSendRate); // Respect message send rate
+                        Thread.sleep(messageSendRate);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         System.err.println("Message sender thread interrupted: " + e.toString());
@@ -314,8 +307,8 @@ class Iris {
         public void startServer() {
             ServerSocket serverSocket = null;
             try {
-                serverSocket = new ServerSocket(Configurable.getBotSocketPort());
-                System.out.println("HTTP Server listening on port " + Configurable.getBotSocketPort());
+                serverSocket = new ServerSocket(Configurable.getInstance().getBotSocketPort());
+                System.out.println("HTTP Server listening on port " + Configurable.getInstance().getBotSocketPort());
 
                 while (true) {
                     Socket clientSocket = null;
@@ -331,7 +324,7 @@ class Iris {
                     }
                 }
             } catch (IOException e) {
-                System.err.println("Could not listen on port " + Configurable.getBotSocketPort() + ": " + e.toString());
+                System.err.println("Could not listen on port " + Configurable.getInstance().getBotSocketPort() + ": " + e.toString());
                 System.exit(1);
             } finally {
                 if (serverSocket != null) {
@@ -352,34 +345,49 @@ class Iris {
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
 
                 String requestLine = in.readLine();
-                if (requestLine == null || !requestLine.startsWith("POST ")) {
+                if (requestLine == null) {
+                    sendBadRequestResponse(out, "Invalid Request");
+                    return;
+                }
+
+                String[] requestParts = requestLine.split(" ");
+                if (requestParts.length < 2) {
                     sendBadRequestResponse(out, "Invalid Request Line");
                     return;
                 }
+                String method = requestParts[0];
+                String requestPath = requestParts[1];
 
-                String requestPath = requestLine.split(" ")[1];
 
-                String contentType = null;
-                String line;
-                while ((line = in.readLine()) != null && !line.isEmpty()) {
-                    if (line.toLowerCase().startsWith("content-type: ")) {
-                        contentType = line.substring("Content-Type: ".length()).trim();
+                if ("POST".equals(method)) {
+                    String contentType = null;
+                    String line;
+                    while ((line = in.readLine()) != null && !line.isEmpty()) {
+                        if (line.toLowerCase().startsWith("content-type: ")) {
+                            contentType = line.substring("Content-Type: ".length()).trim();
+                        }
                     }
+
+                    if (!"application/json".equalsIgnoreCase(contentType)) {
+                        sendBadRequestResponse(out, "Content-Type must be application/json");
+                        return;
+                    }
+
+                    StringBuilder requestBody = new StringBuilder();
+                    while (in.ready()) {
+                        requestBody.append((char) in.read());
+                    }
+                    String requestBodyString = requestBody.toString();
+
+                    String responseString = handleHttpRequestLogic(requestPath, requestBodyString);
+                    sendOkResponse(out, responseString);
+                } else if ("GET".equals(method)) {
+                    String responseString = handleHttpGetRequest(requestPath);
+                    sendOkResponse(out, responseString);
+                } else {
+                    sendBadRequestResponse(out, "Method not supported: " + method);
                 }
 
-                if (!"application/json".equalsIgnoreCase(contentType)) {
-                    sendBadRequestResponse(out, "Content-Type must be application/json");
-                    return;
-                }
-
-                StringBuilder requestBody = new StringBuilder();
-                while (in.ready()) {
-                    requestBody.append((char) in.read());
-                }
-                String requestBodyString = requestBody.toString();
-
-                String responseString = handleHttpRequestLogic(requestPath, requestBodyString);
-                sendOkResponse(out, responseString);
 
             } catch (IOException e) {
                 System.err.println("IO Exception in client connection: " + e.toString());
@@ -401,6 +409,84 @@ class Iris {
                 System.out.println("Client connection handled and closed.");
             }
         }
+
+        private String handleHttpGetRequest(String requestPath) {
+            if (requestPath.startsWith("/config/endpoint")) {
+                String endpoint = getQueryParam(requestPath, "endpoint");
+                if (endpoint != null) {
+                    Configurable.getInstance().setWebServerEndpoint(endpoint);
+                    return createSuccessResponse("Endpoint updated to: " + endpoint);
+                } else {
+                    return createErrorResponse("Endpoint parameter missing.");
+                }
+            } else if (requestPath.startsWith("/config/dbrate")) {
+                String rateStr = getQueryParam(requestPath, "rate");
+                if (rateStr != null) {
+                    try {
+                        long rate = Long.parseLong(rateStr);
+                        Configurable.getInstance().setDbPollingRate(rate);
+                        return createSuccessResponse("DB polling rate updated to: " + rate);
+                    } catch (NumberFormatException e) {
+                        return createErrorResponse("Invalid rate format.");
+                    }
+                } else {
+                    return createErrorResponse("Rate parameter missing.");
+                }
+            } else if (requestPath.startsWith("/config/sendrate")) {
+                String rateStr = getQueryParam(requestPath, "rate");
+                if (rateStr != null) {
+                    try {
+                        long rate = Long.parseLong(rateStr);
+                        Configurable.getInstance().setMessageSendRate(rate);
+                        Replier.messageSendRate = rate;
+                        return createSuccessResponse("Message send rate updated to: " + rate);
+                    } catch (NumberFormatException e) {
+                        return createErrorResponse("Invalid rate format.");
+                    }
+                } else {
+                    return createErrorResponse("Rate parameter missing.");
+                }
+            } else if (requestPath.startsWith("/config/info")) {
+                return getConfigInfo();
+            }
+            return createErrorResponse("Invalid config endpoint.");
+        }
+
+        private String getConfigInfo() {
+            Configurable config = Configurable.getInstance();
+            JSONObject configJson = new JSONObject();
+            try {
+                configJson.put("bot_name", config.getBotName());
+                configJson.put("bot_http_port", config.getBotSocketPort());
+                configJson.put("web_server_endpoint", config.getWebServerEndpoint());
+                configJson.put("db_polling_rate", config.getDbPollingRate());
+                configJson.put("message_send_rate", config.getMessageSendRate());
+                configJson.put("bot_id", config.getBotId());
+            } catch (JSONException e) {
+                return createErrorResponse("Failed to serialize config to JSON: " + e.toString());
+            }
+            return createSuccessResponse(configJson.toString());
+        }
+
+
+        private String getQueryParam(String requestPath, String paramName) {
+            try {
+                if (requestPath.contains("?")) {
+                    String queryString = requestPath.substring(requestPath.indexOf("?") + 1);
+                    String[] params = queryString.split("&");
+                    for (String param : params) {
+                        String[] keyValuePair = param.split("=");
+                        if (keyValuePair.length == 2 && keyValuePair[0].equals(paramName)) {
+                            return URLDecoder.decode(keyValuePair[1], StandardCharsets.UTF_8.name());
+                        }
+                    }
+                }
+            } catch (UnsupportedEncodingException e) {
+                System.err.println("Error decoding URL parameter: " + e.toString());
+            }
+            return null;
+        }
+
 
         private String handleHttpRequestLogic(String requestPath, String requestBody) {
             try {
@@ -481,8 +567,8 @@ class Iris {
             try {
                 int enc = obj.getInt("enc");
                 String b64_ciphertext = obj.getString("b64_ciphertext");
-                long user_id = obj.optLong("user_id", Configurable.getBotId());
-                String plain_text = Iris.KakaoDecrypt.decrypt(enc, b64_ciphertext, user_id);
+                long user_id = obj.optLong("user_id", Configurable.getInstance().getBotId());
+                String plain_text = KakaoDecrypt.decrypt(enc, b64_ciphertext, user_id);
                 JSONObject responseJson = new JSONObject();
                 responseJson.put("plain_text", plain_text);
                 return responseJson.toString();
@@ -537,6 +623,18 @@ class Iris {
             }
         }
 
+        private String createSuccessResponse(String message) {
+            try {
+                JSONObject responseJson = new JSONObject();
+                responseJson.put("success", true);
+                responseJson.put("message", message);
+                return responseJson.toString();
+            } catch (JSONException e) {
+                return "{\"success\":false, \"error\":\"Failed to create success JSON response with message.\"}";
+            }
+        }
+
+
         private String createQuerySuccessResponse(Object queryResult) {
             try {
                 JSONObject responseJson = new JSONObject();
@@ -580,21 +678,21 @@ class Iris {
                         try {
                             JSONObject vJson = new JSONObject(vStr);
                             int enc = vJson.optInt("enc", 0);
-                            long userId = rowJson.optLong("user_id", Configurable.getBotId());
+                            long userId = rowJson.optLong("user_id", Configurable.getInstance().getBotId());
                             if (rowJson.has("message")) {
                                 String encryptedMessage = rowJson.getString("message");
                                 if (encryptedMessage == null || encryptedMessage.isEmpty() || encryptedMessage.equals("{}")) {
-                                    // pass as is without decryption
+
                                 } else {
-                                    rowJson.put("message", Iris.KakaoDecrypt.decrypt(enc, encryptedMessage, userId));
+                                    rowJson.put("message", KakaoDecrypt.decrypt(enc, encryptedMessage, userId));
                                 }
                             }
                             if (rowJson.has("attachment")) {
                                 String encryptedAttachment = rowJson.getString("attachment");
                                 if (encryptedAttachment == null || encryptedAttachment.isEmpty() || encryptedAttachment.equals("{}")) {
-                                    // pass as is without decryption
+
                                 } else {
-                                    rowJson.put("attachment", Iris.KakaoDecrypt.decrypt(enc, encryptedAttachment, userId));
+                                    rowJson.put("attachment", KakaoDecrypt.decrypt(enc, encryptedAttachment, userId));
                                 }
                             }
                         } catch (JSONException e) {
@@ -605,12 +703,12 @@ class Iris {
                     }
                 }
 
-                long botId = Configurable.getBotId();
+                long botId = Configurable.getInstance().getBotId();
                 int enc = rowJson.optInt("enc", 0);
                 if (rowJson.has("nickname")) {
                     try {
                         String encryptedNickname = rowJson.getString("nickname");
-                        rowJson.put("nickname", Iris.KakaoDecrypt.decrypt(enc, encryptedNickname, botId));
+                        rowJson.put("nickname", KakaoDecrypt.decrypt(enc, encryptedNickname, botId));
                     } catch (Exception e) {
                         System.err.println("Decryption error for nickname: " + e.toString());
                     }
@@ -621,7 +719,7 @@ class Iris {
                         String encryptedUrl = rowJson.optString(urlKey, null);
                         if (encryptedUrl != null) {
                             try {
-                                rowJson.put(urlKey, Iris.KakaoDecrypt.decrypt(enc, encryptedUrl, botId));
+                                rowJson.put(urlKey, KakaoDecrypt.decrypt(enc, encryptedUrl, botId));
                             } catch (Exception e) {
                                 System.err.println("Decryption error for " + urlKey + ": " + e.toString());
                             }
@@ -669,15 +767,25 @@ class Iris {
     }
 
     static class Configurable {
+        private static Configurable instance;
         private static JSONObject config;
         private static long BOT_ID_CONFIG;
         private static String BOT_NAME_CONFIG;
         private static int BOT_HTTP_PORT_CONFIG;
         private static String WEB_SERVER_ENDPOINT_CONFIG;
         private static long DB_POLLING_RATE_CONFIG = 100;
-        private static long MESSAGE_SEND_RATE_CONFIG = 50; // Default message send rate
+        private static long MESSAGE_SEND_RATE_CONFIG = 50;
 
-        public static void loadConfig(String configFile) {
+        private Configurable() {}
+
+        public static synchronized Configurable getInstance() {
+            if (instance == null) {
+                instance = new Configurable();
+            }
+            return instance;
+        }
+
+        public void loadConfig(String configFile) {
             StringBuilder sb = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(new FileReader(configFile))) {
                 String line;
@@ -703,16 +811,61 @@ class Iris {
             }
         }
 
-        public static long getBotId() { return KakaoDecrypt.BOT_USER_ID; }
-        public static void setBotId(long botId) { KakaoDecrypt.BOT_USER_ID = botId; }
-        public static String getBotName() { return BOT_NAME_CONFIG; }
-        public static int getBotSocketPort() { return BOT_HTTP_PORT_CONFIG; }
-        public static String getWebServerEndpoint() { return WEB_SERVER_ENDPOINT_CONFIG; }
-        public static long getDbPollingRate() { return DB_POLLING_RATE_CONFIG; }
-        public static long getMessageSendRate() { return MESSAGE_SEND_RATE_CONFIG; } // Getter for message send rate
+
+        private synchronized void saveConfig() {
+            try (FileOutputStream fos = new FileOutputStream(CONFIG_FILE_PATH);
+                 PrintWriter writer = new PrintWriter(new OutputStreamWriter(fos, StandardCharsets.UTF_8))) {
+                writer.print(config.toString(4));
+            } catch (IOException e) {
+                System.err.println("Error writing config to file: " + e.toString());
+            } catch (JSONException e) {
+                System.err.println("JSON error while saving config: " + e.toString());
+            }
+        }
+
+        public long getBotId() { return KakaoDecrypt.BOT_USER_ID; }
+        public void setBotId(long botId) { KakaoDecrypt.BOT_USER_ID = botId; }
+        public String getBotName() { return BOT_NAME_CONFIG; }
+        public int getBotSocketPort() { return BOT_HTTP_PORT_CONFIG; }
+        public String getWebServerEndpoint() { return WEB_SERVER_ENDPOINT_CONFIG; }
+        public long getDbPollingRate() { return DB_POLLING_RATE_CONFIG; }
+        public long getMessageSendRate() { return MESSAGE_SEND_RATE_CONFIG; }
+
+        public synchronized void setWebServerEndpoint(String endpoint) {
+            WEB_SERVER_ENDPOINT_CONFIG = endpoint;
+            try {
+                config.put("web_server_endpoint", endpoint);
+            } catch (JSONException e) {
+                System.err.println("JSON error updating web_server_endpoint in config: " + e.toString());
+            }
+            saveConfig();
+            System.out.println("WebServerEndpoint updated to: " + WEB_SERVER_ENDPOINT_CONFIG);
+        }
+
+        public synchronized void setDbPollingRate(long rate) {
+            DB_POLLING_RATE_CONFIG = rate;
+            try {
+                config.put("db_polling_rate", rate);
+            } catch (JSONException e) {
+                System.err.println("JSON error updating db_polling_rate in config: " + e.toString());
+            }
+            saveConfig();
+            System.out.println("DbPollingRate updated to: " + DB_POLLING_RATE_CONFIG);
+        }
+
+        public synchronized void setMessageSendRate(long rate) {
+            MESSAGE_SEND_RATE_CONFIG = rate;
+            try {
+                config.put("message_send_rate", rate);
+            } catch (JSONException e) {
+                System.err.println("JSON error updating message_send_rate in config: " + e.toString());
+            }
+            saveConfig();
+            System.out.println("MessageSendRate updated to: " + MESSAGE_SEND_RATE_CONFIG);
+        }
     }
 
-    static class KakaoDecrypt extends Configurable {
+    static class KakaoDecrypt {
         private static final java.util.Map<String, byte[]> keyCache = new java.util.HashMap<>();
         public static long BOT_USER_ID;
 
@@ -906,14 +1059,14 @@ class Iris {
         }
     }
 
-    static class KakaoDB extends Iris.Configurable {
+    static class KakaoDB {
         private SQLiteDatabase db = null;
         private long BOT_ID;
         private String BOT_NAME;
-
+        private final Configurable config = Configurable.getInstance();
 
         public KakaoDB() {
-            BOT_NAME = Configurable.getBotName();
+            BOT_NAME = config.getBotName();
 
             try {
                 db = SQLiteDatabase.openDatabase(DB_PATH + "/KakaoTalk.db", null, SQLiteDatabase.OPEN_READWRITE);
@@ -1014,7 +1167,7 @@ class Iris {
                 if (cursor != null && cursor.moveToNext()) {
                     String row_name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     String enc = cursor.getString(cursor.getColumnIndexOrThrow("enc"));
-                    dec_row_name = Iris.KakaoDecrypt.decrypt(Integer.parseInt(enc), row_name, Configurable.getBotId());
+                    dec_row_name = KakaoDecrypt.decrypt(Integer.parseInt(enc), row_name, config.getBotId());
                 }
 
             } catch (SQLiteException e) {
@@ -1034,7 +1187,7 @@ class Iris {
 
         public String[] getUserInfo(long chatId, long userId) {
             String sender;
-            if (userId == Configurable.getBotId()) {
+            if (userId == config.getBotId()) {
                 sender = BOT_NAME;
             } else {
                 sender = getNameOfUserId(userId);
@@ -1140,18 +1293,63 @@ class Iris {
         }
     }
 
-    static class ObserverHelper extends Iris.Configurable {
+    static class DBObserver {
+        private final KakaoDB kakaoDb;
+        private final ObserverHelper observerHelper;
+        private Thread pollingThread;
+
+        public DBObserver(KakaoDB kakaoDb, ObserverHelper observerHelper) {
+            this.kakaoDb = kakaoDb;
+            this.observerHelper = observerHelper;
+        }
+
+        public void startPolling() {
+            if (pollingThread == null || !pollingThread.isAlive()) {
+                pollingThread = new Thread(() -> {
+                    while (true) {
+                        observerHelper.checkChange(kakaoDb);
+                        try {
+                            long pollingInterval = Configurable.getInstance().getDbPollingRate();
+                            Thread.sleep(pollingInterval);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            System.err.println("Polling thread interrupted: " + e.toString());
+                            break;
+                        }
+                    }
+                });
+                pollingThread.setName("DB-Polling-Thread");
+                pollingThread.start();
+                System.out.println("DB Polling thread started.");
+            } else {
+                System.out.println("DB Polling thread is already running.");
+            }
+        }
+
+        public void stopPolling() {
+            if (pollingThread != null && pollingThread.isAlive()) {
+                pollingThread.interrupt();
+                pollingThread = null;
+                System.out.println("DB Polling thread stopped.");
+            }
+        }
+    }
+
+
+    static class ObserverHelper {
         private long lastLogId = 0;
         private long BOT_ID;
         private String BOT_NAME;
         private int BOT_HTTP_PORT;
         private String WEB_SERVER_ENDPOINT;
+        private final Configurable config = Configurable.getInstance();
+
 
         public ObserverHelper() {
-            BOT_ID = Configurable.getBotId();
-            BOT_NAME = Configurable.getBotName();
-            BOT_HTTP_PORT = Configurable.getBotSocketPort();
-            WEB_SERVER_ENDPOINT = Configurable.getWebServerEndpoint();
+            BOT_ID = config.getBotId();
+            BOT_NAME = config.getBotName();
+            BOT_HTTP_PORT = config.getBotSocketPort();
+            WEB_SERVER_ENDPOINT = config.getWebServerEndpoint();
         }
 
         private String makePostData(String decMsg, String room, String sender, JSONObject js) throws JSONException {
@@ -1163,7 +1361,7 @@ class Iris {
             return data.toString();
         }
 
-        public void checkChange(Iris.KakaoDB db) {
+        public void checkChange(KakaoDB db) {
             if (lastLogId == 0) {
                 Map<String, Object> lastLog = db.logToDict(0);
                 if (lastLog != null && lastLog.containsKey("_id")) {
@@ -1250,13 +1448,13 @@ class Iris {
                                 if (enc_msg == null || enc_msg.isEmpty() || enc_msg.equals("{}")){
                                     dec_msg = "{}}";
                                 } else {
-                                    dec_msg = Iris.KakaoDecrypt.decrypt(encType, enc_msg, user_id);
+                                    dec_msg = KakaoDecrypt.decrypt(encType, enc_msg, user_id);
                                     logJson.put("message", dec_msg);
                                 }
                                 if (enc_attachment == null || enc_attachment.isEmpty() || enc_attachment.equals("{}") || res.getColumnIndexOrThrow("attachment") == -1){
                                     dec_attachment = "{}";
                                 } else {
-                                    dec_attachment = Iris.KakaoDecrypt.decrypt(encType, enc_attachment, user_id);
+                                    dec_attachment = KakaoDecrypt.decrypt(encType, enc_attachment, user_id);
                                 }
                                 logJson.put("attachment", dec_attachment);
                             } catch (Exception e) {

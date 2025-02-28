@@ -218,6 +218,55 @@ HTTP 서버는 `config.json` (`bot_http_port`)에 지정된 포트에서 수신 
     }
     ```
 
+##### 설정 API 엔드포인트 (GET)
+
+다음 엔드포인트들을 사용하여 애플리케이션을 재시작하지 않고도 Iris의 설정을 동적으로 변경할 수 있습니다. 이 엔드포인트들은 `GET` 요청을 통해 접근합니다.
+
+*   **`/config/endpoint?endpoint=[YOUR_WEB_SERVER_URL]`**: 메시지 전달을 위한 웹 서버 엔드포인트를 업데이트합니다.
+
+    **예시:**
+
+    ```bash
+    curl http://[YOUR_DEVICE_IP]:[bot_http_port]/config/endpoint?endpoint=http://192.168.1.100:5000/new_messages
+    ```
+
+*   **`/config/dbrate?rate=[DATABASE_POLLING_INTERVAL_IN_MILLISECONDS]`**: 데이터베이스 폴링 속도를 업데이트합니다. 이 값을 조정하면 Iris가 데이터베이스에서 새로운 메시지를 얼마나 자주 확인하는지 변경됩니다. 낮은 값은 CPU 사용량을 증가시키지만 메시지 감지를 더 즉각적으로 제공할 수 있습니다.
+
+    **예시:**
+
+    ```bash
+    curl http://[YOUR_DEVICE_IP]:[bot_http_port]/config/dbrate?rate=300
+    ```
+
+*   **`/config/sendrate?rate=[MESSAGE_SEND_INTERVAL_IN_MILLISECONDS]`**: 메시지 전송 속도를 업데이트합니다. 이는 카카오톡으로 메시지를 보내는 최소 간격을 제어하여 메시지 전송 빈도를 관리하는 데 도움이 됩니다.
+
+    **예시:**
+
+    ```bash
+    curl http://[YOUR_DEVICE_IP]:[bot_http_port]/config/sendrate?rate=200
+    ```
+
+*   **`/config/info`**: 현재 구성을 JSON 응답으로 검색합니다. 현재 활성 설정을 확인하는 데 유용합니다.
+
+    **예시:**
+
+    ```bash
+    curl http://[YOUR_DEVICE_IP]:[bot_http_port]/config/info
+    ```
+
+    **응답 (JSON):**
+
+    ```json
+    {
+      "bot_name": "[YOUR_BOT_NAME]",
+      "bot_http_port": [PORT_FOR_HTTP_SERVER],
+      "web_server_endpoint": "[YOUR_WEB_SERVER_URL_FOR_MESSAGE_FORWARDING],
+      "db_polling_rate": [DATABASE_POLLING_INTERVAL_IN_MILLISECONDS],
+      "message_send_rate": [MESSAGE_SEND_INTERVAL_IN_MILLISECONDS],
+      "bot_id": [YOUR_KAKAO_TALK_USER_ID]
+    }
+    ```
+
 #### 메시지 전달을 위한 API 참조
 
 Iris가 카카오톡 데이터베이스에서 새 메시지를 감지하면 `config.json`에 구성된 `web_server_endpoint`로 `POST` 요청을 보냅니다. 요청 본문은 다음 구조의 JSON 객체입니다:
