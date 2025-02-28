@@ -121,8 +121,8 @@ The HTTP server listens on the port specified in your `config.json` (`bot_http_p
     ```
 
 *   **`/query`**: Execute an SQL query on the KakaoTalk database. This method automatically decrypts encrypted data fields in the response.
-*   If `message` or `attachment` are queried with `user_id` and `enc`, it will return decrypted value.
-*   If `nickname`, `profile_image_url`, `full_profile_image_url`, or `original_profile_image_url` are queried with `enc`, it will also return the plain text.
+    > If `message` or `attachment` are queried with `user_id` and `enc`, it will return decrypted value.
+    > If `nickname`, `profile_image_url`, `full_profile_image_url`, or `original_profile_image_url` are queried with `enc`, it will also return the plain text.
 
     **Request Body (JSON):**
 
