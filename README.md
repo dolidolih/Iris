@@ -218,6 +218,55 @@ The HTTP server listens on the port specified in your `config.json` (`bot_http_p
     }
     ```
 
+##### Configuration API Endpoints (GET)
+
+The following endpoints allow you to dynamically reconfigure Iris without restarting the application. These are accessed using `GET` requests.
+
+*   **`/config/endpoint?endpoint=[YOUR_WEB_SERVER_URL]`**: Update the web server endpoint for message forwarding.
+
+    **Example:**
+
+    ```bash
+    curl http://[YOUR_DEVICE_IP]:[bot_http_port]/config/endpoint?endpoint=http://192.168.1.100:5000/new_messages
+    ```
+
+*   **`/config/dbrate?rate=[DATABASE_POLLING_INTERVAL_IN_MILLISECONDS]`**: Update the database polling rate. Adjusting this value changes how frequently Iris checks for new messages in the database. Lower values increase CPU usage but may provide more immediate message detection.
+
+    **Example:**
+
+    ```bash
+    curl http://[YOUR_DEVICE_IP]:[bot_http_port]/config/dbrate?rate=300
+    ```
+
+*   **`/config/sendrate?rate=[MESSAGE_SEND_INTERVAL_IN_MILLISECONDS]`**: Update the message send rate. This controls the minimum interval between sending messages to KakaoTalk, helping to manage send frequency.
+
+    **Example:**
+
+    ```bash
+    curl http://[YOUR_DEVICE_IP]:[bot_http_port]/config/sendrate?rate=200
+    ```
+
+*   **`/config/info`**: Retrieve the current configuration as a JSON response. This is useful for verifying the currently active settings.
+
+    **Example:**
+
+    ```bash
+    curl http://[YOUR_DEVICE_IP]:[bot_http_port]/config/info
+    ```
+
+    **Response (JSON):**
+
+    ```json
+    {
+      "bot_name": "[YOUR_BOT_NAME]",
+      "bot_http_port": [PORT_FOR_HTTP_SERVER],
+      "web_server_endpoint": "[YOUR_WEB_SERVER_URL_FOR_MESSAGE_FORWARDING],
+      "db_polling_rate": [DATABASE_POLLING_INTERVAL_IN_MILLISECONDS],
+      "message_send_rate": [MESSAGE_SEND_INTERVAL_IN_MILLISECONDS],
+      "bot_id": [YOUR_KAKAO_TALK_USER_ID]
+    }
+    ```
+
 #### API Reference for Message Forwarding
 
 When Iris detects a new message in the KakaoTalk database, it sends a `POST` request to the `web_server_endpoint` configured in `config.json`. The request body is a JSON object with the following structure:
