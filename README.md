@@ -43,10 +43,10 @@ This project allows you to automate interactions with KakaoTalk, extract data fr
 
 ### Setup
 
-1.  **Clone the repository:** (If you are distributing the code)
+1.  **Clone the repository(or Download Released file):**
     ```bash
-    git clone [repository-url]
-    cd [repository-directory]
+    git clone https://github.com/dolidolih/Iris.git
+    cd Iris
     ```
 
 2.  **Configure `config.json`:**

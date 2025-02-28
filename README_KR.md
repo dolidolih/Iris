@@ -43,10 +43,10 @@
 
 ### 설정
 
-1.  **리포지토리 복제:** (코드를 배포하는 경우)
+1.  **Git Clone(혹은 Release 다운로드):**
     ```bash
-    git clone [repository-url]
-    cd [repository-directory]
+    git clone https://github.com/dolidolih/Iris.git
+    cd Iris
     ```
 
 2.  **`config.json` 구성:**
