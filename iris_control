@@ -5,7 +5,7 @@ IRIS_PROCESS_KEYWORD="app_process"
 IRIS_START_COMMAND="adb shell 'su root sh -c \"CLASSPATH=/data/local/tmp/Iris.dex app_process / Iris > /dev/null 2>&1\"' &"
 
 get_iris_pid() {
-  pid=$(ps aux | grep "Iris" | grep "app_process" | grep -v "sh -c" | awk '{print $2}')
+  pid=$(adb shell ps -f | grep "$IRIS_PROCESS_NAME" | grep "$IRIS_PROCESS_KEYWORD" | grep -v 'sh -c' | awk '{print $2}')
   echo "$pid"
 }
 
@@ -39,7 +39,7 @@ iris_stop() {
   pid=$(get_iris_pid)
   if [ -n "$pid" ]; then
     echo "Stopping Iris service..."
-    sudo kill -9 "$pid"
+    adb shell "su root sh -c 'kill -s SIGKILL $pid'"
     sleep 1 # Give it some time to stop. Adjust if needed.
     stopped_pid=$(get_iris_pid)
     if [ -z "$stopped_pid" ]; then

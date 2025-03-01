@@ -191,7 +191,7 @@ public class HttpServer {
         } catch (JSONException e) {
             return createErrorResponse("Failed to serialize config to JSON: " + e.toString());
         }
-        return createSuccessResponse(configJson.toString());
+        return createSuccessResponse(configJson);
     }
 
 
@@ -349,7 +349,7 @@ public class HttpServer {
         }
     }
 
-    private String createSuccessResponse(String message) {
+    private String createSuccessResponse(Object message) {
         try {
             JSONObject responseJson = new JSONObject();
             responseJson.put("success", true);
@@ -359,7 +359,6 @@ public class HttpServer {
             return "{\"success\":false, \"error\":\"Failed to create success JSON response with message.\"}";
         }
     }
-
 
     private String createQuerySuccessResponse(Object queryResult) {
         try {

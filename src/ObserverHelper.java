@@ -21,18 +21,13 @@ import java.net.URL;
 
 public class ObserverHelper {
     private long lastLogId = 0;
-    private long BOT_ID;
     private String BOT_NAME;
-    private int BOT_HTTP_PORT;
     private String WEB_SERVER_ENDPOINT;
     private final Configurable config = Configurable.getInstance();
 
 
     public ObserverHelper() {
-        BOT_ID = config.getBotId();
         BOT_NAME = config.getBotName();
-        BOT_HTTP_PORT = config.getBotSocketPort();
-        WEB_SERVER_ENDPOINT = config.getWebServerEndpoint();
     }
 
     private String makePostData(String decMsg, String room, String sender, JSONObject js) throws JSONException {
@@ -156,7 +151,7 @@ public class ObserverHelper {
                         String postData;
                         try {
                             postData = makePostData(dec_msg, room, sender, logJson);
-                            sendPostRequest(WEB_SERVER_ENDPOINT, postData);
+                            sendPostRequest(Configurable.getInstance().getWebServerEndpoint(), postData);
                         } catch (JSONException e) {
                             System.err.println("JSON error creating post data: " + e.getMessage());
                         }
