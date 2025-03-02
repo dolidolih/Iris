@@ -1,3 +1,4 @@
+// SendMsg : ye-seola/go-kdb
 import org.json.JSONObject;
 import org.json.JSONException;
 import org.json.JSONArray;
@@ -164,7 +165,7 @@ public class HttpServer {
                 try {
                     long rate = Long.parseLong(rateStr);
                     Configurable.getInstance().setMessageSendRate(rate);
-                    Replier.messageSendRate = rate; // Accessing public static messageSendRate
+                    Replier.messageSendRate = rate;
                     return createSuccessResponse("Message send rate updated to: " + rate);
                 } catch (NumberFormatException e) {
                     return createErrorResponse("Invalid rate format.");
@@ -191,7 +192,11 @@ public class HttpServer {
         } catch (JSONException e) {
             return createErrorResponse("Failed to serialize config to JSON: " + e.toString());
         }
+<<<<<<< HEAD
+        return createObjectSuccessResponse(configJson);
+=======
         return createSuccessResponse(configJson);
+>>>>>>> 26f1cb96ddc0dc0c496726951efe72c9030398e4
     }
 
 
@@ -245,11 +250,20 @@ public class HttpServer {
 
         if ("image".equals(type)) {
             Replier.SendPhoto(Long.parseLong(room), data);
-        } else {
+        } else if ("image_multiple".equals(type)) {
+            JSONArray dataArray = obj.getJSONArray("data");
+            List<String> imageBase64List = new ArrayList<>();
+            for (int i = 0; i < dataArray.length(); i++) {
+                imageBase64List.add(dataArray.getString(i));
+            }
+            Replier.SendMultiplePhotos(Long.parseLong(room), imageBase64List);
+        }
+         else {
             Replier.SendMessage(NOTI_REF, Long.parseLong(room), data);
         }
         return createSuccessResponse();
     }
+
 
     private String handleQueryFunction(JSONObject obj) {
         try {
@@ -360,6 +374,20 @@ public class HttpServer {
         }
     }
 
+<<<<<<< HEAD
+    private String createObjectSuccessResponse(Object message) {
+        try {
+            JSONObject responseJson = new JSONObject();
+            responseJson.put("success", true);
+            responseJson.put("message", message);
+            return responseJson.toString();
+        } catch (JSONException e) {
+            return "{\"success\":false, \"error\":\"Failed to create success JSON response with message.\"}";
+        }
+    }
+
+=======
+>>>>>>> 26f1cb96ddc0dc0c496726951efe72c9030398e4
     private String createQuerySuccessResponse(Object queryResult) {
         try {
             JSONObject responseJson = new JSONObject();
