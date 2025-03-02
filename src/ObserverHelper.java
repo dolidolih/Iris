@@ -22,7 +22,6 @@ import java.net.URL;
 public class ObserverHelper {
     private long lastLogId = 0;
     private String BOT_NAME;
-    private String WEB_SERVER_ENDPOINT;
     private final Configurable config = Configurable.getInstance();
 
 
@@ -151,14 +150,14 @@ public class ObserverHelper {
                         String postData;
                         try {
                             postData = makePostData(dec_msg, room, sender, logJson);
-                            sendPostRequest(Configurable.getInstance().getWebServerEndpoint(), postData);
+                            sendPostRequest(postData); // Call sendPostRequest without endpoint parameter
                         } catch (JSONException e) {
                             System.err.println("JSON error creating post data: " + e.getMessage());
                         }
                         System.out.println("New message from " + sender + " in " + room + ": " + dec_msg);
 
                     }
-                } 
+                }
             } catch (SQLiteException e) {
                 System.err.println("SQL error in checkChange (data query): " + e.getMessage());
             } finally {
@@ -169,7 +168,9 @@ public class ObserverHelper {
         }
     }
 
-    private void sendPostRequest(String urlStr, String jsonData) {
+    // Modified sendPostRequest to fetch endpoint each time
+    private void sendPostRequest(String jsonData) {
+        String urlStr = Configurable.getInstance().getWebServerEndpoint(); // Get endpoint here
         System.out.println("Sending HTTP POST request to: " + urlStr);
         System.out.println("JSON Data being sent: " + jsonData);
         try {
