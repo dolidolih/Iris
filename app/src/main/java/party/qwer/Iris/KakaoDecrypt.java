@@ -2,18 +2,11 @@ package party.qwer.Iris;
 
 // Kakaodecrypt : jiru/kakaodecrypt
 
-import java.util.HashMap;
-import java.util.Map;
-import java.io.IOException;
-import android.util.Base64;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 public class KakaoDecrypt {
     private static final java.util.Map<String, byte[]> keyCache = new java.util.HashMap<>();

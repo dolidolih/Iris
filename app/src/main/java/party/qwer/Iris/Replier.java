@@ -11,10 +11,8 @@ import java.io.IOException;
 import java.io.File;
 import java.io.FileOutputStream;
 import android.net.Uri;
-import java.io.OutputStream;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import android.os.IBinder;
 import java.util.List;
 import java.util.ArrayList;
@@ -22,7 +20,7 @@ import java.util.ArrayList;
 public class Replier {
     private static IBinder binder = ServiceManager.getService("activity");
     private static IActivityManager activityManager = IActivityManager.Stub.asInterface(binder);
-    private static final String NOTI_REF = Iris.NOTI_REF;
+    private static final String NOTI_REF = Main.NOTI_REF;
     private static final BlockingQueue<SendMessageRequest> messageQueue = new LinkedBlockingQueue<>();
     public static long messageSendRate = Configurable.getInstance().getMessageSendRate();
 
@@ -81,7 +79,7 @@ public class Replier {
     private static void SendPhotoInternal(Long room, String base64ImageDataString) throws Exception {
         byte[] decodedImage = android.util.Base64.decode(base64ImageDataString, android.util.Base64.DEFAULT);
         String timestamp = String.valueOf(System.currentTimeMillis());
-        File picDir = new File(Iris.IMAGE_DIR_PATH);
+        File picDir = new File(Main.IMAGE_DIR_PATH);
         if (!picDir.exists()) {
             picDir.mkdirs();
         }
@@ -166,7 +164,7 @@ public class Replier {
         for (String base64ImageDataString : base64ImageDataStrings) {
             byte[] decodedImage = android.util.Base64.decode(base64ImageDataString, android.util.Base64.DEFAULT);
             String timestamp = String.valueOf(System.currentTimeMillis());
-            File picDir = new File(Iris.IMAGE_DIR_PATH);
+            File picDir = new File(Main.IMAGE_DIR_PATH);
             if (!picDir.exists()) {
                 picDir.mkdirs();
             }
