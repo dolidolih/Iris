@@ -1,4 +1,4 @@
-package party.qwer.Iris;
+package party.qwer.iris;
 
 import org.json.JSONObject;
 import org.json.JSONException;

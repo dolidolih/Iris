@@ -1,4 +1,4 @@
-package party.qwer.Iris;
+package party.qwer.iris;
 
 // SendMsg : ye-seola/go-kdb
 import android.os.ServiceManager;

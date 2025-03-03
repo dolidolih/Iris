@@ -1,4 +1,4 @@
-package party.qwer.Iris;
+package party.qwer.iris;
 
 import java.io.File;
 import java.util.concurrent.Executors;
