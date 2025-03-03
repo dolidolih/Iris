@@ -186,20 +186,31 @@ public class HttpServer {
     }
 
     private String handleHttpGetRequest(String requestPath) {
-        Function<String, String> handler = getEndpointHandlers.get(requestPath.split("\\?")[0]);
+        String normalizedPath = normalizePath(requestPath); // Normalize the path
+
+        Function<String, String> handler = getEndpointHandlers.get(normalizedPath.split("\\?")[0]);
         if (handler != null) {
-            return handler.apply(requestPath);
+            return handler.apply(requestPath); // Keep original requestPath for handler to use query params if needed
         } else {
-            if ("/config".equals(requestPath)) {
+            if ("/config".equals(normalizedPath)) { // Use startsWith for /config
                 return handleConfigPage(requestPath);
-            } else if ("/config/info".equals(requestPath)) {
+            } else if ("/config/info".equals(normalizedPath)) { // Use equals with normalized path
                 return handleConfigInfo(requestPath);
-            } else if ("/config/dbstatus".equals(requestPath)) {
+            } else if ("/config/dbstatus".equals(normalizedPath)) { // Use equals with normalized path
                 return handleConfigDbStatus(requestPath);
             }
             return createErrorResponse("Invalid GET endpoint.");
         }
     }
+
+    // Helper function to normalize path by removing trailing slash
+    private String normalizePath(String path) {
+        if (path != null && path.endsWith("/")) {
+            return path.substring(0, path.length() - 1);
+        }
+        return path;
+    }
+
 
     private String generateConfigPageHtml() {
         Configurable config = Configurable.getInstance();
@@ -376,7 +387,7 @@ public class HttpServer {
                 "            const responseArea = document.getElementById(responseAreaId);\n" +
                 "            if (responseArea) responseArea.textContent = 'Sending request...';\n" +
 
-        "            let formData = {};\n" +
+                "            let formData = {};\n" +
                 "            if (postDataOverride) { // Use postDataOverride if provided\n" +
                 "                formData = postDataOverride;\n" +
                 "            } else {\n" +
@@ -433,7 +444,7 @@ public class HttpServer {
                 "                postData = { rate: value };\n" +
                 "            }\n" +
                 "            submitForm(url, null, null, postData); \n" +
-        "        }\n" +
+                "        }\n" +
 
 
                 "    </script>\n" +
