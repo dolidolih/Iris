@@ -39,7 +39,7 @@ public class Configurable {
                 sb.append(line);
             }
         } catch (IOException e) {
-            System.err.println("Error reading config.json: " + e.toString());
+            System.err.println("Error reading config.json: " + e);
         }
         try {
             config = new JSONObject(sb.toString());
@@ -53,7 +53,7 @@ public class Configurable {
                 MESSAGE_SEND_RATE_CONFIG = config.getLong("message_send_rate");
             }
         } catch (JSONException e) {
-            System.err.println("JSON parsing error in config.json: " + e.toString());
+            System.err.println("JSON parsing error in config.json: " + e);
         }
     }
 
@@ -63,14 +63,14 @@ public class Configurable {
              PrintWriter writer = new PrintWriter(new OutputStreamWriter(fos, StandardCharsets.UTF_8))) {
             writer.print(config.toString(4));
         } catch (IOException e) {
-            System.err.println("Error writing config to file: " + e.toString());
+            System.err.println("Error writing config to file: " + e);
         } catch (JSONException e) {
-            System.err.println("JSON error while saving config: " + e.toString());
+            System.err.println("JSON error while saving config: " + e);
         }
     }
 
-    public long getBotId() { return KakaoDecrypt.BOT_USER_ID; }
-    public void setBotId(long botId) { KakaoDecrypt.BOT_USER_ID = botId; }
+    public long getBotId() { return BOT_ID_CONFIG; }
+    public void setBotId(long botId) { BOT_ID_CONFIG = botId; }
     public String getBotName() { return BOT_NAME_CONFIG; }
     public int getBotSocketPort() { return BOT_HTTP_PORT_CONFIG; }
     public String getWebServerEndpoint() { return WEB_SERVER_ENDPOINT_CONFIG; }
@@ -82,7 +82,7 @@ public class Configurable {
         try {
             config.put("web_server_endpoint", endpoint);
         } catch (JSONException e) {
-            System.err.println("JSON error updating web_server_endpoint in config: " + e.toString());
+            System.err.println("JSON error updating web_server_endpoint in config: " + e);
         }
         saveConfig();
         System.out.println("WebServerEndpoint updated to: " + WEB_SERVER_ENDPOINT_CONFIG);
@@ -93,7 +93,7 @@ public class Configurable {
         try {
             config.put("db_polling_rate", rate);
         } catch (JSONException e) {
-            System.err.println("JSON error updating db_polling_rate in config: " + e.toString());
+            System.err.println("JSON error updating db_polling_rate in config: " + e);
         }
         saveConfig();
         System.out.println("DbPollingRate updated to: " + DB_POLLING_RATE_CONFIG);
@@ -104,7 +104,7 @@ public class Configurable {
         try {
             config.put("message_send_rate", rate);
         } catch (JSONException e) {
-            System.err.println("JSON error updating message_send_rate in config: " + e.toString());
+            System.err.println("JSON error updating message_send_rate in config: " + e);
         }
         saveConfig();
         System.out.println("MessageSendRate updated to: " + MESSAGE_SEND_RATE_CONFIG);
