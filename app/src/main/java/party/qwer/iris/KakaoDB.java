@@ -1,4 +1,4 @@
-package party.qwer.Iris;
+package party.qwer.iris;
 
 import java.util.Collections;
 import java.util.HashMap;

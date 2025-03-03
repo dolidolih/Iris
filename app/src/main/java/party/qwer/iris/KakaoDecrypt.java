@@ -1,4 +1,4 @@
-package party.qwer.Iris;
+package party.qwer.iris;
 
 // Kakaodecrypt : jiru/kakaodecrypt
 

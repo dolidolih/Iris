@@ -1,7 +1,7 @@
 // SendMsg : ye-seola/go-kdb
 // Kakaodecrypt : jiru/kakaodecrypt
 
-package party.qwer.Iris;
+package party.qwer.iris;
 
 import android.os.IBinder;
 import android.os.ServiceManager;
@@ -17,10 +17,10 @@ public class Main {
 
     private static final IBinder binder = ServiceManager.getService("activity");
     private static final IActivityManager activityManager = IActivityManager.Stub.asInterface(binder);
-    public static final String NOTI_REF; // Changed to public static final
+    public static final String NOTI_REF;
     private static final String CONFIG_FILE_PATH = "/data/local/tmp/config.json";
     private static final String DB_PATH = "/data/data/com.kakao.talk/databases";
-    public static final String IMAGE_DIR_PATH = "/sdcard/Android/data/com.kakao.talk/files"; // Changed to public static final
+    public static final String IMAGE_DIR_PATH = "/sdcard/Android/data/com.kakao.talk/files";
 
 
     static {

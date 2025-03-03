@@ -1,4 +1,4 @@
-package party.qwer.Iris;
+package party.qwer.iris;
 
 public class DBObserver {
     private final KakaoDB kakaoDb;
