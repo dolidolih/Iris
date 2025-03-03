@@ -19,15 +19,32 @@ import java.util.ArrayList;
 import java.util.List;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteException;
+import java.util.function.Function;
 
 public class HttpServer {
     private final KakaoDB kakaoDb;
     private static final String NOTI_REF = Main.NOTI_REF;
     private volatile boolean isRunning = false;
 
+    private final Map<String, Function<JSONObject, String>> postEndpointHandlers = new HashMap<>();
+    private final Map<String, Function<String, String>> getEndpointHandlers = new HashMap<>();
+
     public HttpServer(KakaoDB kakaoDb) {
         this.kakaoDb = kakaoDb;
+        initializeEndpointHandlers();
     }
+
+    private void initializeEndpointHandlers() {
+        postEndpointHandlers.put("/reply", this::handleReplyFunction);
+        postEndpointHandlers.put("/query", this::handleQueryFunction);
+        postEndpointHandlers.put("/decrypt", this::handleDecryptFunction);
+
+        getEndpointHandlers.put("/config/endpoint", this::handleConfigEndpoint);
+        getEndpointHandlers.put("/config/dbrate", this::handleConfigDbRate);
+        getEndpointHandlers.put("/config/sendrate", this::handleConfigSendRate);
+        getEndpointHandlers.put("/config/info", this::handleConfigInfo);
+    }
+
 
     public void startServer() {
         ServerSocket serverSocket = null;
@@ -151,48 +168,58 @@ public class HttpServer {
     }
 
     private String handleHttpGetRequest(String requestPath) {
-        if (requestPath.startsWith("/config/endpoint")) {
-            String endpoint = getQueryParam(requestPath, "endpoint");
-            if (endpoint != null) {
-                Configurable.getInstance().setWebServerEndpoint(endpoint);
-                return createSuccessResponse("Endpoint updated to: " + endpoint);
-            } else {
-                return createErrorResponse("Endpoint parameter missing.");
-            }
-        } else if (requestPath.startsWith("/config/dbrate")) {
-            String rateStr = getQueryParam(requestPath, "rate");
-            if (rateStr != null) {
-                try {
-                    long rate = Long.parseLong(rateStr);
-                    Configurable.getInstance().setDbPollingRate(rate);
-                    return createSuccessResponse("DB polling rate updated to: " + rate);
-                } catch (NumberFormatException e) {
-                    return createErrorResponse("Invalid rate format.");
-                }
-            } else {
-                return createErrorResponse("Rate parameter missing.");
-            }
-        } else if (requestPath.startsWith("/config/sendrate")) {
-            String rateStr = getQueryParam(requestPath, "rate");
-            if (rateStr != null) {
-                try {
-                    long rate = Long.parseLong(rateStr);
-                    Configurable.getInstance().setMessageSendRate(rate);
-                    Replier.messageSendRate = rate;
-                    return createSuccessResponse("Message send rate updated to: " + rate);
-                } catch (NumberFormatException e) {
-                    return createErrorResponse("Invalid rate format.");
-                }
-            } else {
-                return createErrorResponse("Rate parameter missing.");
-            }
-        } else if (requestPath.startsWith("/config/info")) {
-            return getConfigInfo();
-        } else if (requestPath.equals("/stop")) {
-            isRunning = false;
-            return createSuccessResponse("Server stopping...");
+        Function<String, String> handler = getEndpointHandlers.get(requestPath.split("\\?")[0]);
+        if (handler != null) {
+            return handler.apply(requestPath);
+        } else {
+            return createErrorResponse("Invalid config endpoint.");
         }
-        return createErrorResponse("Invalid config endpoint.");
+    }
+
+
+    private String handleConfigEndpoint(String requestPath) {
+        String endpoint = getQueryParam(requestPath, "endpoint");
+        if (endpoint != null) {
+            Configurable.getInstance().setWebServerEndpoint(endpoint);
+            return createSuccessResponse("Endpoint updated to: " + endpoint);
+        } else {
+            return createErrorResponse("Endpoint parameter missing.");
+        }
+    }
+
+    private String handleConfigDbRate(String requestPath) {
+        String rateStr = getQueryParam(requestPath, "rate");
+        if (rateStr != null) {
+            try {
+                long rate = Long.parseLong(rateStr);
+                Configurable.getInstance().setDbPollingRate(rate);
+                return createSuccessResponse("DB polling rate updated to: " + rate);
+            } catch (NumberFormatException e) {
+                return createErrorResponse("Invalid rate format.");
+            }
+        } else {
+            return createErrorResponse("Rate parameter missing.");
+        }
+    }
+
+    private String handleConfigSendRate(String requestPath) {
+        String rateStr = getQueryParam(requestPath, "rate");
+        if (rateStr != null) {
+            try {
+                long rate = Long.parseLong(rateStr);
+                Configurable.getInstance().setMessageSendRate(rate);
+                Replier.messageSendRate = rate;
+                return createSuccessResponse("Message send rate updated to: " + rate);
+            } catch (NumberFormatException e) {
+                return createErrorResponse("Invalid rate format.");
+            }
+        } else {
+            return createErrorResponse("Rate parameter missing.");
+        }
+    }
+
+    private String handleConfigInfo(String requestPath) {
+        return getConfigInfo();
     }
 
     private String getConfigInfo() {
@@ -232,48 +259,46 @@ public class HttpServer {
 
 
     private String handleHttpRequestLogic(String requestPath, String requestBody) {
-        try {
-            JSONObject obj = new JSONObject(requestBody);
-
-            if ("/reply".equals(requestPath)) {
-                return handleReplyFunction(obj);
-            } else if ("/query".equals(requestPath)) {
-                return handleQueryFunction(obj);
-            } else if ("/decrypt".equals(requestPath)) {
-                return handleDecryptFunction(obj);
+        Function<JSONObject, String> handler = postEndpointHandlers.get(requestPath);
+        if (handler != null) {
+            try {
+                JSONObject requestJson = new JSONObject(requestBody);
+                return handler.apply(requestJson);
+            } catch (JSONException e) {
+                System.err.println("JSON parsing error: " + e);
+                return createErrorResponse("Invalid JSON request: " + e);
+            } catch (Exception e) {
+                System.err.println("Error processing request: " + e);
+                return createErrorResponse("Error processing request: " + e);
             }
-            else {
-                return createErrorResponse("Invalid endpoint.");
-            }
-
-        } catch (JSONException e) {
-            System.err.println("JSON parsing error: " + e);
-            return createErrorResponse("Invalid JSON request: " + e);
-        } catch (Exception e) {
-            System.err.println("Error processing request: " + e);
-            return createErrorResponse("Error processing request: " + e);
+        } else {
+            return createErrorResponse("Invalid endpoint.");
         }
     }
 
-    private String handleReplyFunction(JSONObject obj) throws Exception {
-        String type = obj.optString("type");
-        String room = obj.getString("room");
-        String data = obj.getString("data");
+    private String handleReplyFunction(JSONObject obj) {
+        try {
+            String type = obj.optString("type");
+            String room = obj.getString("room");
+            String data = obj.getString("data");
 
-        if ("image".equals(type)) {
-            Replier.SendPhoto(Long.parseLong(room), data);
-        } else if ("image_multiple".equals(type)) {
-            JSONArray dataArray = obj.getJSONArray("data");
-            List<String> imageBase64List = new ArrayList<>();
-            for (int i = 0; i < dataArray.length(); i++) {
-                imageBase64List.add(dataArray.getString(i));
+            if ("image".equals(type)) {
+                Replier.SendPhoto(Long.parseLong(room), data);
+            } else if ("image_multiple".equals(type)) {
+                JSONArray dataArray = obj.getJSONArray("data");
+                List<String> imageBase64List = new ArrayList<>();
+                for (int i = 0; i < dataArray.length(); i++) {
+                    imageBase64List.add(dataArray.getString(i));
+                }
+                Replier.SendMultiplePhotos(Long.parseLong(room), imageBase64List);
             }
-            Replier.SendMultiplePhotos(Long.parseLong(room), imageBase64List);
+            else {
+                Replier.SendMessage(NOTI_REF, Long.parseLong(room), data);
+            }
+            return createSuccessResponse();
+        } catch (Exception e) {
+            return createErrorResponse("Error in reply function: " + e);
         }
-        else {
-            Replier.SendMessage(NOTI_REF, Long.parseLong(room), data);
-        }
-        return createSuccessResponse();
     }
 
 
