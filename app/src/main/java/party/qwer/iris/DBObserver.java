@@ -4,6 +4,7 @@ public class DBObserver {
     private final KakaoDB kakaoDb;
     private final ObserverHelper observerHelper;
     private Thread pollingThread;
+    private volatile boolean isObservingDatabase = false;
 
     public DBObserver(KakaoDB kakaoDb, ObserverHelper observerHelper) {
         this.kakaoDb = kakaoDb;
@@ -13,6 +14,7 @@ public class DBObserver {
     public void startPolling() {
         if (pollingThread == null || !pollingThread.isAlive()) {
             pollingThread = new Thread(() -> {
+                isObservingDatabase = true;
                 while (true) {
                     observerHelper.checkChange(kakaoDb);
                     try {
@@ -21,9 +23,11 @@ public class DBObserver {
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         System.err.println("Polling thread interrupted: " + e);
+                        isObservingDatabase = false;
                         break;
                     }
                 }
+                isObservingDatabase = false;
             });
             pollingThread.setName("DB-Polling-Thread");
             pollingThread.start();
@@ -37,7 +41,16 @@ public class DBObserver {
         if (pollingThread != null && pollingThread.isAlive()) {
             pollingThread.interrupt();
             pollingThread = null;
+            isObservingDatabase = false;
             System.out.println("DB Polling thread stopped.");
         }
+    }
+
+    public boolean isPollingThreadAlive() {
+        return pollingThread != null && pollingThread.isAlive();
+    }
+
+    public boolean isObserving() {
+        return isObservingDatabase;
     }
 }
