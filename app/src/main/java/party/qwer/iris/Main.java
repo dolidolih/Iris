@@ -77,7 +77,7 @@ public class Main {
         imageDeleter.startDeletion();
         System.out.println("ImageDeleter started, and will delete images older than 1 hour.");
 
-        HttpServer httpServer = new HttpServer(kakaoDb);
+        HttpServer httpServer = new HttpServer(kakaoDb, dbObserver, observerHelper);
         httpServer.startServer();
         System.out.println("HTTP Server started");
 

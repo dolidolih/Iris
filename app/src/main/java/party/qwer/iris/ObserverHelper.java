@@ -2,6 +2,7 @@ package party.qwer.iris;
 
 import org.json.JSONObject;
 import org.json.JSONException;
+import org.json.JSONArray;
 
 import java.util.Collections;
 import java.util.Map;
@@ -16,9 +17,16 @@ import java.net.HttpURLConnection;
 import java.io.OutputStream;
 import java.net.URL;
 import java.util.Objects;
+import java.util.HashMap;
+import java.text.SimpleDateFormat;
+import java.util.TimeZone;
+import java.util.Date;
+import java.util.LinkedList;
 
 public class ObserverHelper {
     private long lastLogId = 0;
+    private final LinkedList<Map<String, Object>> lastDecryptedLogs = new LinkedList<>(); // Store last decrypted logs
+    private static final int MAX_LOGS_STORED = 50; // Maximum number of logs to store
 
     private String makePostData(String decMsg, String room, String sender, JSONObject js) throws JSONException {
         JSONObject data = new JSONObject();
@@ -138,6 +146,8 @@ public class ObserverHelper {
                         try {
                             postData = makePostData(dec_msg, room, sender, logJson);
                             sendPostRequest(postData);
+                            // Store decrypted log for config page
+                            storeDecryptedLog(res, dec_msg); // Call storeDecryptedLog here
                         } catch (JSONException e) {
                             System.err.println("JSON error creating post data: " + e.getMessage());
                         }
@@ -155,9 +165,33 @@ public class ObserverHelper {
         }
     }
 
+    private synchronized void storeDecryptedLog(Cursor cursor, String decryptedMessage) {
+        Map<String, Object> logEntry = new HashMap<>();
+        logEntry.put("_id", cursor.getString(cursor.getColumnIndexOrThrow("_id")));
+        logEntry.put("chat_id", cursor.getString(cursor.getColumnIndexOrThrow("chat_id")));
+        logEntry.put("user_id", cursor.getString(cursor.getColumnIndexOrThrow("user_id")));
+        logEntry.put("message", decryptedMessage);
+        long createdAtTimestamp = cursor.getLong(cursor.getColumnIndexOrThrow("created_at"));
+        Date date = new Date(createdAtTimestamp * 1000L);
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        sdf.setTimeZone(TimeZone.getTimeZone("GMT+9"));
+        logEntry.put("created_at", sdf.format(date));
+
+        lastDecryptedLogs.addFirst(logEntry); // Add to the front as it's reverse chronological
+        if (lastDecryptedLogs.size() > MAX_LOGS_STORED) {
+            lastDecryptedLogs.removeLast(); // Remove the oldest log if over limit
+        }
+    }
+
+
+    public List<Map<String, Object>> getLastChatLogs() {
+        return new ArrayList<>(lastDecryptedLogs); // Return a copy to avoid external modification
+    }
+
+
     // Modified sendPostRequest to fetch endpoint each time
     private void sendPostRequest(String jsonData) {
-        String urlStr = Configurable.getInstance().getWebServerEndpoint(); // Get endpoint here
+        String urlStr = Configurable.getInstance().getWebServerEndpoint();
         System.out.println("Sending HTTP POST request to: " + urlStr);
         System.out.println("JSON Data being sent: " + jsonData);
         try {
