@@ -15,6 +15,7 @@ import android.database.sqlite.SQLiteException;
 import java.net.HttpURLConnection;
 import java.io.OutputStream;
 import java.net.URL;
+import java.util.Objects;
 
 public class ObserverHelper {
     private long lastLogId = 0;
@@ -32,7 +33,7 @@ public class ObserverHelper {
         if (lastLogId == 0) {
             Map<String, Object> lastLog = db.logToDict(0);
             if (lastLog != null && lastLog.containsKey("_id")) {
-                lastLogId = Long.parseLong((String)lastLog.get("_id"));
+                lastLogId = Long.parseLong((String) Objects.requireNonNull(lastLog.get("_id")));
             } else {
                 lastLogId = 0;
             }
@@ -70,11 +71,11 @@ public class ObserverHelper {
                 }
 
 
-                while (res != null && res.moveToNext()) {
+                while (res.moveToNext()) {
                     long currentLogId = res.getLong(res.getColumnIndexOrThrow("_id"));
                     if (currentLogId > lastLogId) {
                         lastLogId = currentLogId;
-                        int encType = 0;
+                        int encType;
                         String origin = "";
                         try {
                             JSONObject v = new JSONObject(res.getString(res.getColumnIndexOrThrow("v")));
@@ -96,7 +97,6 @@ public class ObserverHelper {
                                 logJson.put(columnName, res.getString(res.getColumnIndexOrThrow(columnName)));
                             } catch (JSONException e) {
                                 System.err.println("JSONException while adding log data to JSON object: " + e.getMessage());
-                                continue;
                             }
                         }
 
@@ -108,7 +108,7 @@ public class ObserverHelper {
 
 
                         String dec_msg;
-                        String dec_attachment = null;
+                        String dec_attachment;
                         try {
                             if (enc_msg == null || enc_msg.isEmpty() || enc_msg.equals("{}")){
                                 dec_msg = "{}}";
@@ -125,7 +125,6 @@ public class ObserverHelper {
                         } catch (Exception e) {
                             System.err.println("Decryption error for logId " + currentLogId + ": " + e);
                             dec_msg = enc_msg;
-                            dec_attachment = enc_attachment;
                         }
 
                         long chat_id = res.getLong(res.getColumnIndexOrThrow("chat_id"));
@@ -138,7 +137,7 @@ public class ObserverHelper {
                         String postData;
                         try {
                             postData = makePostData(dec_msg, room, sender, logJson);
-                            sendPostRequest(postData); // Call sendPostRequest without endpoint parameter
+                            sendPostRequest(postData);
                         } catch (JSONException e) {
                             System.err.println("JSON error creating post data: " + e.getMessage());
                         }
@@ -162,17 +161,7 @@ public class ObserverHelper {
         System.out.println("Sending HTTP POST request to: " + urlStr);
         System.out.println("JSON Data being sent: " + jsonData);
         try {
-            URL url = new URL(urlStr);
-            HttpURLConnection con = (HttpURLConnection) url.openConnection();
-            con.setRequestMethod("POST");
-            con.setRequestProperty("Content-Type", "application/json");
-            con.setRequestProperty("Accept", "application/json");
-            con.setDoOutput(true);
-
-            try (OutputStream os = con.getOutputStream()) {
-                byte[] input = jsonData.getBytes(StandardCharsets.UTF_8);
-                os.write(input, 0, input.length);
-            }
+            HttpURLConnection con = getHttpURLConnection(jsonData, urlStr);
 
             int responseCode = con.getResponseCode();
             System.out.println("HTTP Response Code: " + responseCode);
@@ -194,5 +183,20 @@ public class ObserverHelper {
         } catch (IOException e) {
             System.err.println("IO error sending POST request: " + e.getMessage());
         }
+    }
+
+    private static HttpURLConnection getHttpURLConnection(String jsonData, String urlStr) throws IOException {
+        URL url = new URL(urlStr);
+        HttpURLConnection con = (HttpURLConnection) url.openConnection();
+        con.setRequestMethod("POST");
+        con.setRequestProperty("Content-Type", "application/json");
+        con.setRequestProperty("Accept", "application/json");
+        con.setDoOutput(true);
+
+        try (OutputStream os = con.getOutputStream()) {
+            byte[] input = jsonData.getBytes(StandardCharsets.UTF_8);
+            os.write(input, 0, input.length);
+        }
+        return con;
     }
 }
