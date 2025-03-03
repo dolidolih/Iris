@@ -1,10 +1,5 @@
 package party.qwer.Iris;
 
-import java.io.IOException;
-import java.util.concurrent.TimeUnit;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 public class DBObserver {
     private final KakaoDB kakaoDb;
     private final ObserverHelper observerHelper;

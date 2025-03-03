@@ -6,8 +6,6 @@ package party.qwer.Iris;
 import android.os.IBinder;
 import android.os.ServiceManager;
 import android.app.IActivityManager;
-import android.content.ComponentName;
-import android.content.Intent;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.File;

@@ -19,10 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
-import java.net.HttpURLConnection;
-import java.net.URL;
 
 public class HttpServer {
     private final KakaoDB kakaoDb;

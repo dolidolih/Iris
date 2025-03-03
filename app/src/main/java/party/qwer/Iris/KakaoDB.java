@@ -1,13 +1,7 @@
 package party.qwer.Iris;
 
-import android.os.IBinder;
-import android.os.ServiceManager;
-import android.app.IActivityManager;
-
 import java.util.HashMap;
 import java.util.Map;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import android.database.Cursor;
