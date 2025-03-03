@@ -10,19 +10,14 @@ import android.database.sqlite.SQLiteException;
 
 public class KakaoDB {
     private SQLiteDatabase db = null;
-    public long BOT_ID;
-    private String BOT_NAME;
-    private final Configurable config = Configurable.getInstance();
     private static final String DB_PATH = "/data/data/com.kakao.talk/databases";
 
 
     public KakaoDB() {
-        BOT_NAME = config.getBotName();
-
         try {
             db = SQLiteDatabase.openDatabase(DB_PATH + "/KakaoTalk.db", null, SQLiteDatabase.OPEN_READWRITE);
             db.execSQL("ATTACH DATABASE '" + DB_PATH + "/KakaoTalk2.db' AS db2");
-            this.BOT_ID = getBotUserIdFromDB();
+            getBotUserIdFromDB();
         } catch (SQLiteException e) {
             System.err.println("SQLiteException: " + e.getMessage());
             System.err.println("You don't have a permission to access KakaoTalk Database.");
@@ -30,7 +25,7 @@ public class KakaoDB {
         }
     }
 
-    public long getBotUserIdFromDB() {
+    public void getBotUserIdFromDB() {
         long botUserId = -1;
         Cursor cursor = null;
         try {
@@ -39,6 +34,7 @@ public class KakaoDB {
             if (cursor != null && cursor.moveToFirst()) {
                 botUserId = cursor.getLong(0);
                 System.out.println("Bot user_id is detected: " + botUserId);
+                Configurable.getInstance().setBotId(botUserId);
             } else {
                 System.err.println("Warning: Bot user_id not found in chat_logs with isMine:true. Decryption might not work correctly.");
             }
@@ -49,7 +45,6 @@ public class KakaoDB {
                 cursor.close();
             }
         }
-        return botUserId;
     }
 
 
@@ -118,7 +113,7 @@ public class KakaoDB {
             if (cursor != null && cursor.moveToNext()) {
                 String row_name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                 String enc = cursor.getString(cursor.getColumnIndexOrThrow("enc"));
-                dec_row_name = KakaoDecrypt.decrypt(Integer.parseInt(enc), row_name, config.getBotId());
+                dec_row_name = KakaoDecrypt.decrypt(Integer.parseInt(enc), row_name, Configurable.getInstance().getBotId());
             }
 
         } catch (SQLiteException e) {
@@ -138,8 +133,8 @@ public class KakaoDB {
 
     public String[] getUserInfo(long chatId, long userId) {
         String sender;
-        if (userId == config.getBotId()) {
-            sender = BOT_NAME;
+        if (userId == Configurable.getInstance().getBotId()) {
+            sender = Configurable.getInstance().getBotName();
         } else {
             sender = getNameOfUserId(userId);
         }

@@ -37,7 +37,7 @@ public class HttpServer {
             System.out.println("HTTP Server listening on port " + Configurable.getInstance().getBotSocketPort());
 
             while (true) {
-                Socket clientSocket = null;
+                Socket clientSocket;
                 try {
                     clientSocket = serverSocket.accept();
                     System.out.println("Client connected: " + clientSocket.getInetAddress());
@@ -46,18 +46,18 @@ public class HttpServer {
                     new Thread(() -> handleClient(finalClientSocket)).start();
 
                 } catch (IOException e) {
-                    System.err.println("IO Exception in server accept: " + e.toString());
+                    System.err.println("IO Exception in server accept: " + e);
                 }
             }
         } catch (IOException e) {
-            System.err.println("Could not listen on port " + Configurable.getInstance().getBotSocketPort() + ": " + e.toString());
+            System.err.println("Could not listen on port " + Configurable.getInstance().getBotSocketPort() + ": " + e);
             System.exit(1);
         } finally {
             if (serverSocket != null) {
                 try {
                     serverSocket.close();
                 } catch (IOException e) {
-                    System.err.println("Error closing server socket: " + e.toString());
+                    System.err.println("Error closing server socket: " + e);
                 }
             }
         }
@@ -116,7 +116,7 @@ public class HttpServer {
 
 
         } catch (IOException e) {
-            System.err.println("IO Exception in client connection: " + e.toString());
+            System.err.println("IO Exception in client connection: " + e);
             sendInternalServerErrorResponse(out, "IO Error processing request");
         } finally {
             try {
@@ -130,7 +130,7 @@ public class HttpServer {
                     clientSocket.close();
                 }
             } catch (IOException e) {
-                System.err.println("Error closing socket resources: " + e.toString());
+                System.err.println("Error closing socket resources: " + e);
             }
             System.out.println("Client connection handled and closed.");
         }
@@ -189,7 +189,7 @@ public class HttpServer {
             configJson.put("message_send_rate", config.getMessageSendRate());
             configJson.put("bot_id", config.getBotId());
         } catch (JSONException e) {
-            return createErrorResponse("Failed to serialize config to JSON: " + e.toString());
+            return createErrorResponse("Failed to serialize config to JSON: " + e);
         }
         return createObjectSuccessResponse(configJson);
     }
@@ -208,7 +208,7 @@ public class HttpServer {
                 }
             }
         } catch (UnsupportedEncodingException e) {
-            System.err.println("Error decoding URL parameter: " + e.toString());
+            System.err.println("Error decoding URL parameter: " + e);
         }
         return null;
     }
@@ -230,11 +230,11 @@ public class HttpServer {
             }
 
         } catch (JSONException e) {
-            System.err.println("JSON parsing error: " + e.toString());
-            return createErrorResponse("Invalid JSON request: " + e.toString());
+            System.err.println("JSON parsing error: " + e);
+            return createErrorResponse("Invalid JSON request: " + e);
         } catch (Exception e) {
-            System.err.println("Error processing request: " + e.toString());
-            return createErrorResponse("Error processing request: " + e.toString());
+            System.err.println("Error processing request: " + e);
+            return createErrorResponse("Error processing request: " + e);
         }
     }
 
@@ -290,11 +290,11 @@ public class HttpServer {
             }
 
         } catch (JSONException | ClassCastException e) {
-            return createErrorResponse("Invalid 'query' or 'queries' field for query function. " + e.toString());
+            return createErrorResponse("Invalid 'query' or 'queries' field for query function. " + e);
         } catch (SQLiteException e) {
-            return createErrorResponse("Database query error: " + e.toString());
+            return createErrorResponse("Database query error: " + e);
         } catch (Exception e) {
-            return createErrorResponse("Error executing query: " + e.toString());
+            return createErrorResponse("Error executing query: " + e);
         }
     }
 
@@ -309,7 +309,7 @@ public class HttpServer {
             return responseJson.toString();
 
         } catch (Exception e) {
-            return createErrorResponse("Decryption error: " + e.toString());
+            return createErrorResponse("Decryption error: " + e);
         }
     }
 
@@ -326,9 +326,7 @@ public class HttpServer {
 
     private List<Map<String, Object>> executeQuery(String sqlQuery, String[] bindArgs) {
         List<Map<String, Object>> resultList = new ArrayList<>();
-        Cursor cursor = null;
-        try {
-            cursor = kakaoDb.getConnection().rawQuery(sqlQuery, bindArgs);
+        try (Cursor cursor = kakaoDb.getConnection().rawQuery(sqlQuery, bindArgs)) {
             if (cursor != null) {
                 String[] columnNames = cursor.getColumnNames();
                 while (cursor.moveToNext()) {
@@ -339,10 +337,6 @@ public class HttpServer {
                     }
                     resultList.add(row);
                 }
-            }
-        } finally {
-            if (cursor != null) {
-                cursor.close();
             }
         }
         return resultList;
@@ -419,7 +413,7 @@ public class HttpServer {
         try {
             if (rowJson.has("message") || rowJson.has("attachment")) {
                 String vStr = rowJson.optString("v");
-                if (vStr != null && !vStr.isEmpty()) {
+                if (!vStr.isEmpty()) {
                     try {
                         JSONObject vJson = new JSONObject(vStr);
                         int enc = vJson.optInt("enc", 0);
@@ -441,9 +435,9 @@ public class HttpServer {
                             }
                         }
                     } catch (JSONException e) {
-                        System.err.println("Error parsing 'v' for decryption: " + e.toString());
+                        System.err.println("Error parsing 'v' for decryption: " + e);
                     } catch (Exception e) {
-                        System.err.println("Decryption error for message/attachment: " + e.toString());
+                        System.err.println("Decryption error for message/attachment: " + e);
                     }
                 }
             }
@@ -455,7 +449,7 @@ public class HttpServer {
                     String encryptedNickname = rowJson.getString("nickname");
                     rowJson.put("nickname", KakaoDecrypt.decrypt(enc, encryptedNickname, botId));
                 } catch (Exception e) {
-                    System.err.println("Decryption error for nickname: " + e.toString());
+                    System.err.println("Decryption error for nickname: " + e);
                 }
             }
             String[] urlKeys = {"profile_image_url", "full_profile_image_url", "original_profile_image_url"};
@@ -466,14 +460,14 @@ public class HttpServer {
                         try {
                             rowJson.put(urlKey, KakaoDecrypt.decrypt(enc, encryptedUrl, botId));
                         } catch (Exception e) {
-                            System.err.println("Decryption error for " + urlKey + ": " + e.toString());
+                            System.err.println("Decryption error for " + urlKey + ": " + e);
                         }
                     }
                 }
             }
 
         } catch (Exception e) {
-            System.err.println("JSON processing error during decryption: " + e.toString());
+            System.err.println("JSON processing error during decryption: " + e);
         }
     }
 

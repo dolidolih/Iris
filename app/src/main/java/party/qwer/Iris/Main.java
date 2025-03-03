@@ -61,56 +61,27 @@ public class Main {
 
     public static void main(String[] args) {
         Configurable.getInstance().loadConfig(CONFIG_FILE_PATH);
-        KakaoDB kakaoDb = new KakaoDB();
-        Configurable.getInstance().setBotId(kakaoDb.BOT_ID);
-        ObserverHelper observerHelper = new ObserverHelper();
-        HttpServer httpServer = new HttpServer(kakaoDb);
+        System.out.println("Config file has been loaded.");
+
         Replier.startMessageSender();
+        System.out.println("Message sender thread started");
+
+        KakaoDB kakaoDb = new KakaoDB();
+        ObserverHelper observerHelper = new ObserverHelper();
 
         DBObserver dbObserver = new DBObserver(kakaoDb, observerHelper);
         dbObserver.startPolling();
-        System.out.println("Starting DB polling managed by DBObserver");
+        System.out.println("DBObserver started");
 
-        long deletionInterval = TimeUnit.HOURS.toMillis(1);
-        System.out.println("Starting image deletion thread, checking every 1 hour");
-        new Thread(() -> {
-            while (true) {
-                deleteOldImages();
-                try {
-                    Thread.sleep(deletionInterval);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    System.err.println("Image deletion thread interrupted: " + e.toString());
-                    break;
-                }
-            }
-        }).start();
+        ImageDeleter imageDeleter = new ImageDeleter(IMAGE_DIR_PATH, TimeUnit.HOURS.toMillis(1));
+        imageDeleter.startDeletion();
+        System.out.println("ImageDeleter started, and will delete images older than 1 hour.");
 
-
+        HttpServer httpServer = new HttpServer(kakaoDb);
         httpServer.startServer();
+        System.out.println("HTTP Server started");
 
         kakaoDb.closeConnection();
     }
 
-    private static void deleteOldImages() {
-        File imageDir = new File(IMAGE_DIR_PATH);
-        if (!imageDir.exists() || !imageDir.isDirectory()) {
-            System.out.println("Image directory does not exist: " + IMAGE_DIR_PATH);
-            return;
-        }
-
-        long oneDayAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1);
-        File[] files = imageDir.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                if (file.isFile() && file.lastModified() < oneDayAgo) {
-                    if (file.delete()) {
-                        System.out.println("Deleted old image file: " + file.getName());
-                    } else {
-                        System.err.println("Failed to delete image file: " + file.getName());
-                    }
-                }
-            }
-        }
-    }
 }
