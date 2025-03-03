@@ -15,8 +15,8 @@ import java.util.concurrent.TimeUnit;
 
 public class Main {
 
-    private static IBinder binder = ServiceManager.getService("activity");
-    private static IActivityManager activityManager = IActivityManager.Stub.asInterface(binder);
+    private static final IBinder binder = ServiceManager.getService("activity");
+    private static final IActivityManager activityManager = IActivityManager.Stub.asInterface(binder);
     public static final String NOTI_REF; // Changed to public static final
     private static final String CONFIG_FILE_PATH = "/data/local/tmp/config.json";
     private static final String DB_PATH = "/data/data/com.kakao.talk/databases";
@@ -39,14 +39,14 @@ public class Main {
                 }
             }
         } catch (IOException e) {
-            System.err.println("Error reading preferences file: " + e.toString());
+            System.err.println("Error reading preferences file: " + e);
             notiRefValue = "default_noti_ref";
         } finally {
             if (prefsReader != null) {
                 try {
                     prefsReader.close();
                 } catch (IOException e) {
-                    System.err.println("Error closing preferences file reader: " + e.toString());
+                    System.err.println("Error closing preferences file reader: " + e);
                 }
             }
         }

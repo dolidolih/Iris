@@ -20,7 +20,7 @@ public class DBObserver {
                         Thread.sleep(pollingInterval);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
-                        System.err.println("Polling thread interrupted: " + e.toString());
+                        System.err.println("Polling thread interrupted: " + e);
                         break;
                     }
                 }

@@ -4,13 +4,14 @@ package party.qwer.Iris;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Arrays;
+
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 public class KakaoDecrypt {
     private static final java.util.Map<String, byte[]> keyCache = new java.util.HashMap<>();
-    public static long BOT_USER_ID;
 
     private static String incept(int n) {
         String[] dict1 = {"adrp.ldrsh.ldnp", "ldpsw", "umax", "stnp.rsubhn", "sqdmlsl", "uqrshl.csel", "sqshlu", "umin.usubl.umlsl", "cbnz.adds", "tbnz",
@@ -70,9 +71,7 @@ public class KakaoDecrypt {
         int blockSize = 64;
 
         byte[] D = new byte[blockSize];
-        for (int i = 0; i < blockSize; i++) {
-            D[i] = 1;
-        }
+        Arrays.fill(D, (byte) 1);
         byte[] S = new byte[blockSize * ((saltBytes.length + blockSize - 1) / blockSize)];
         for (int i = 0; i < S.length; i++) {
             S[i] = saltBytes[i % saltBytes.length];
@@ -197,7 +196,6 @@ public class KakaoDecrypt {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, ivParameterSpec);
         byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
-        String b64_ciphertext = java.util.Base64.getEncoder().encodeToString(ciphertext);
-        return b64_ciphertext;
+        return java.util.Base64.getEncoder().encodeToString(ciphertext);
     }
 }

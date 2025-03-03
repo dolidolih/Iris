@@ -1,6 +1,5 @@
 package party.qwer.Iris;
 
-// SendMsg : ye-seola/go-kdb
 import org.json.JSONObject;
 import org.json.JSONException;
 import org.json.JSONArray;
@@ -24,7 +23,7 @@ import android.database.sqlite.SQLiteException;
 public class HttpServer {
     private final KakaoDB kakaoDb;
     private static final String NOTI_REF = Main.NOTI_REF;
-
+    private volatile boolean isRunning = false;
 
     public HttpServer(KakaoDB kakaoDb) {
         this.kakaoDb = kakaoDb;
@@ -35,8 +34,9 @@ public class HttpServer {
         try {
             serverSocket = new ServerSocket(Configurable.getInstance().getBotSocketPort());
             System.out.println("HTTP Server listening on port " + Configurable.getInstance().getBotSocketPort());
+            isRunning = true;
 
-            while (true) {
+            while (isRunning) {
                 Socket clientSocket;
                 try {
                     clientSocket = serverSocket.accept();
@@ -46,9 +46,14 @@ public class HttpServer {
                     new Thread(() -> handleClient(finalClientSocket)).start();
 
                 } catch (IOException e) {
+                    if (!isRunning) {
+                        System.out.println("Server socket accept interrupted during shutdown.");
+                        break;
+                    }
                     System.err.println("IO Exception in server accept: " + e);
                 }
             }
+            System.out.println("HTTP Server stopped.");
         } catch (IOException e) {
             System.err.println("Could not listen on port " + Configurable.getInstance().getBotSocketPort() + ": " + e);
             System.exit(1);
@@ -60,6 +65,15 @@ public class HttpServer {
                     System.err.println("Error closing server socket: " + e);
                 }
             }
+        }
+    }
+
+    public void stopServer() {
+        isRunning = false;
+        try (Socket dummySocket = new Socket("localhost", Configurable.getInstance().getBotSocketPort())) {
+            System.out.println("Sent dummy connection to unblock server accept.");
+        } catch (IOException e) {
+            System.err.println("Error sending dummy connection: " + e);
         }
     }
 
@@ -174,6 +188,9 @@ public class HttpServer {
             }
         } else if (requestPath.startsWith("/config/info")) {
             return getConfigInfo();
+        } else if (requestPath.equals("/stop")) {
+            isRunning = false;
+            return createSuccessResponse("Server stopping...");
         }
         return createErrorResponse("Invalid config endpoint.");
     }
@@ -253,7 +270,7 @@ public class HttpServer {
             }
             Replier.SendMultiplePhotos(Long.parseLong(room), imageBase64List);
         }
-         else {
+        else {
             Replier.SendMessage(NOTI_REF, Long.parseLong(room), data);
         }
         return createSuccessResponse();
@@ -420,7 +437,7 @@ public class HttpServer {
                         long userId = rowJson.optLong("user_id", Configurable.getInstance().getBotId());
                         if (rowJson.has("message")) {
                             String encryptedMessage = rowJson.getString("message");
-                            if (encryptedMessage == null || encryptedMessage.isEmpty() || encryptedMessage.equals("{}")) {
+                            if (encryptedMessage.isEmpty() || encryptedMessage.equals("{}")) {
 
                             } else {
                                 rowJson.put("message", KakaoDecrypt.decrypt(enc, encryptedMessage, userId));
@@ -428,7 +445,7 @@ public class HttpServer {
                         }
                         if (rowJson.has("attachment")) {
                             String encryptedAttachment = rowJson.getString("attachment");
-                            if (encryptedAttachment == null || encryptedAttachment.isEmpty() || encryptedAttachment.equals("{}")) {
+                            if (encryptedAttachment.isEmpty() || encryptedAttachment.equals("{}")) {
 
                             } else {
                                 rowJson.put("attachment", KakaoDecrypt.decrypt(enc, encryptedAttachment, userId));
@@ -456,7 +473,7 @@ public class HttpServer {
             for (String urlKey : urlKeys) {
                 if (rowJson.has(urlKey)) {
                     String encryptedUrl = rowJson.optString(urlKey, null);
-                    if (encryptedUrl != null) {
+                    if (!encryptedUrl.isEmpty()) {
                         try {
                             rowJson.put(urlKey, KakaoDecrypt.decrypt(enc, encryptedUrl, botId));
                         } catch (Exception e) {

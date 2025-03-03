@@ -1,12 +1,15 @@
 package party.qwer.Iris;
 
 import java.io.File;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class ImageDeleter {
     private final String imageDirPath;
     private final long deletionInterval;
     private volatile boolean running = true;
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     public ImageDeleter(String imageDirPath, long deletionInterval) {
         this.imageDirPath = imageDirPath;
@@ -14,25 +17,30 @@ public class ImageDeleter {
     }
 
     public void startDeletion() {
-        new Thread(() -> {
-            while (running) {
-                deleteOldImages();
-                try {
-                    Thread.sleep(deletionInterval);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    System.err.println("Image deletion thread interrupted: " + e);
-                    running = false;
-                }
-            }
-        }).start();
+        scheduler.scheduleWithFixedDelay(this::deleteOldImages, 0, deletionInterval, TimeUnit.MILLISECONDS);
     }
 
     public void stopDeletion() {
         running = false;
+        scheduler.shutdown();
+        try {
+            if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+            System.err.println("Error shutting down image deletion scheduler: " + e);
+        }
     }
 
     private void deleteOldImages() {
+        if (!running) {
+            System.out.println("Image deletion task stopped.");
+            scheduler.shutdown();
+            return;
+        }
+
         File imageDir = new File(imageDirPath);
         if (!imageDir.exists() || !imageDir.isDirectory()) {
             System.out.println("Image directory does not exist: " + imageDirPath);

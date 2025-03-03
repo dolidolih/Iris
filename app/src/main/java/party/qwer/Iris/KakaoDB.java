@@ -1,5 +1,6 @@
 package party.qwer.Iris;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayList;
@@ -26,7 +27,7 @@ public class KakaoDB {
     }
 
     public void getBotUserIdFromDB() {
-        long botUserId = -1;
+        long botUserId;
         Cursor cursor = null;
         try {
             String sql = "SELECT user_id FROM chat_logs WHERE v LIKE '%\"isMine\":true%' LIMIT 1;";
@@ -50,22 +51,14 @@ public class KakaoDB {
 
     public List<String> getColumnInfo(String table) {
         List<String> cols = new ArrayList<>();
-        Cursor cursor = null;
-        try {
-            cursor = db.rawQuery("SELECT * FROM " + table + " LIMIT 1", null);
+        try (Cursor cursor = db.rawQuery("SELECT * FROM " + table + " LIMIT 1", null)) {
             if (cursor != null && cursor.moveToFirst()) {
                 String[] columnNames = cursor.getColumnNames();
-                for (String columnName : columnNames) {
-                    cols.add(columnName);
-                }
+                Collections.addAll(cols, columnNames);
             }
         } catch (SQLiteException e) {
             System.err.println("Error in getColumnInfo for table " + table + ": " + e.getMessage());
             return new ArrayList<>();
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
         }
         return cols;
     }
@@ -73,9 +66,7 @@ public class KakaoDB {
 
     public List<String> getTableInfo() {
         List<String> tables = new ArrayList<>();
-        Cursor cursor = null;
-        try {
-            cursor = db.rawQuery("SELECT name FROM sqlite_schema WHERE type='table'", null);
+        try (Cursor cursor = db.rawQuery("SELECT name FROM sqlite_schema WHERE type='table'", null)) {
             if (cursor != null) {
                 while (cursor.moveToNext()) {
                     tables.add(cursor.getString(0));
@@ -84,10 +75,6 @@ public class KakaoDB {
         } catch (SQLiteException e) {
             System.err.println("Error in getTableInfo: " + e.getMessage());
             return new ArrayList<>();
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
         }
         return tables;
     }
@@ -211,18 +198,12 @@ public class KakaoDB {
 
 
     public boolean checkNewDb() {
-        boolean isNewDb = false;
-        Cursor cursor = null;
-        try {
-            cursor = db.rawQuery("SELECT name FROM db2.sqlite_master WHERE type='table' AND name='open_chat_member'", null);
-                isNewDb = cursor.getCount() > 0;
+        boolean isNewDb;
+        try (Cursor cursor = db.rawQuery("SELECT name FROM db2.sqlite_master WHERE type='table' AND name='open_chat_member'", null)) {
+            isNewDb = cursor.getCount() > 0;
         } catch (SQLiteException e) {
             System.err.println("Error in checkNewDb: " + e.getMessage());
             return false;
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
         }
         return isNewDb;
     }

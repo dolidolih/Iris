@@ -18,8 +18,8 @@ import java.util.List;
 import java.util.ArrayList;
 
 public class Replier {
-    private static IBinder binder = ServiceManager.getService("activity");
-    private static IActivityManager activityManager = IActivityManager.Stub.asInterface(binder);
+    private static final IBinder binder = ServiceManager.getService("activity");
+    private static final IActivityManager activityManager = IActivityManager.Stub.asInterface(binder);
     private static final String NOTI_REF = Main.NOTI_REF;
     private static final BlockingQueue<SendMessageRequest> messageQueue = new LinkedBlockingQueue<>();
     public static long messageSendRate = Configurable.getInstance().getMessageSendRate();
@@ -37,10 +37,10 @@ public class Replier {
                     Thread.sleep(messageSendRate);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    System.err.println("Message sender thread interrupted: " + e.toString());
+                    System.err.println("Message sender thread interrupted: " + e);
                     break;
                 } catch (Exception e) {
-                    System.err.println("Error sending message from queue: " + e.toString());
+                    System.err.println("Error sending message from queue: " + e);
                 }
             }
         }).start();
@@ -90,14 +90,14 @@ public class Replier {
             fos.write(decodedImage);
             fos.flush();
         } catch (IOException e) {
-            System.err.println("Error saving image to file: " + e.toString());
+            System.err.println("Error saving image to file: " + e);
             throw e;
         } finally {
             if (fos != null) {
                 try {
                     fos.close();
                 } catch (IOException e) {
-                    System.err.println("Error closing FileOutputStream: " + e.toString());
+                    System.err.println("Error closing FileOutputStream: " + e);
                 }
             }
         }
@@ -124,7 +124,7 @@ public class Replier {
             );
             System.out.println("Media scanner broadcast intent sent for: " + imageUri.toString());
         } catch (Exception e) {
-            System.err.println("Error broadcasting media scanner intent: " + e.toString());
+            System.err.println("Error broadcasting media scanner intent: " + e);
             throw e;
         }
 
@@ -150,7 +150,7 @@ public class Replier {
                     -2
             );
         } catch (Exception e) {
-            System.err.println("Error starting activity for sending image: " + e.toString());
+            System.err.println("Error starting activity for sending image: " + e);
             throw e;
         }
     }
@@ -175,14 +175,14 @@ public class Replier {
                 fos.write(decodedImage);
                 fos.flush();
             } catch (IOException e) {
-                System.err.println("Error saving image to file: " + e.toString());
+                System.err.println("Error saving image to file: " + e);
                 continue;
             } finally {
                 if (fos != null) {
                     try {
                         fos.close();
                     } catch (IOException e) {
-                        System.err.println("Error closing FileOutputStream: " + e.toString());
+                        System.err.println("Error closing FileOutputStream: " + e);
                     }
                 }
             }
@@ -207,7 +207,7 @@ public class Replier {
                 );
                 System.out.println("Media scanner broadcast intent sent for: " + imageUri.toString());
             } catch (Exception e) {
-                System.err.println("Error broadcasting media scanner intent: " + e.toString());
+                System.err.println("Error broadcasting media scanner intent: " + e);
                 continue;
             }
             uris.add(imageUri);
@@ -240,7 +240,7 @@ public class Replier {
                     -2
             );
         } catch (Exception e) {
-            System.err.println("Error starting activity for sending multiple photos: " + e.toString());
+            System.err.println("Error starting activity for sending multiple photos: " + e);
             throw e;
         }
     }
