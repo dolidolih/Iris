@@ -77,13 +77,13 @@
 4.  **dex 파일 실행:**
     서비스로 실행하는 경우 (CTRL+C를 눌러도 Iris는 백그라운드에서 실행됩니다)
     ```bash
-    adb shell "su root sh -c 'CLASSPATH=/data/local/tmp/Iris.dex /system/bin/app_process / Iris' &"
+    adb shell 'su root sh -c "CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.iris.Main" &'
     ```
     로그를 보면서 실행하고 싶은 경우 (CTRL+C를 누르면 Iris가 중지됩니다)
     ```bash
     adb shell
     su
-    sh -c 'CLASSPATH=/data/local/tmp/Iris.dex /system/bin/app_process / Iris'
+    su root sh -c 'CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.iris.Main'
     ```
 
 

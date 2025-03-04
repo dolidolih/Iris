@@ -2,7 +2,7 @@
 
 IRIS_PROCESS_NAME="Iris"
 IRIS_PROCESS_KEYWORD="app_process"
-IRIS_START_COMMAND="adb shell 'su root sh -c \"CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.Iris.Main > /dev/null 2>&1\"' &"
+IRIS_START_COMMAND="adb shell 'su root sh -c \"CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.iris.Main > /dev/null 2>&1\"' &"
 
 get_iris_pid() {
   pid=$(adb shell ps -f | grep "$IRIS_PROCESS_NAME" | grep "$IRIS_PROCESS_KEYWORD" | grep -v 'sh -c' | awk '{print $2}')

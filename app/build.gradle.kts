@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "party.qwer.Iris"
+    namespace = "party.qwer.iris"
     compileSdk = 34
 
     defaultConfig {
