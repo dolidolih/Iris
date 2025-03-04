@@ -180,7 +180,21 @@ public class HttpServer {
                 String responseString = handleHttpRequestLogic(requestPath, requestBodyString);
                 sendOkResponse(out, responseString, "application/json");
 
+            } else if ("GET".equals(method)) {
+            String responseString = handleHttpGetRequest(requestPath);
+            if (responseString.startsWith("HTTP/1.1")) {
+                out.print(responseString);
+                out.flush();
+            } else {
+                String contentType = "text/html";
+                if (requestPath.endsWith(".json")) {
+                    contentType = "application/json";
+                }
+                sendOkResponse(out, responseString, contentType);
             }
+        } else {
+            sendBadRequestResponse(out, "Method not supported: " + method);
+        }
 
         } catch (IOException e) {
             System.err.println("IO Exception in client connection: " + e);
