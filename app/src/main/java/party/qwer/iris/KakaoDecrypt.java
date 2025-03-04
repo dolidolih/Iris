@@ -122,12 +122,12 @@ public class KakaoDecrypt {
 
     public static String decrypt(int encType, String b64_ciphertext, long user_id) throws Exception {
         byte[] keyBytes = new byte[] {
-            (byte)0x16, (byte)0x08, (byte)0x09, (byte)0x6f, (byte)0x02, (byte)0x17, (byte)0x2b, (byte)0x08,
-            (byte)0x21, (byte)0x21, (byte)0x0a, (byte)0x10, (byte)0x03, (byte)0x03, (byte)0x07, (byte)0x06
+                (byte)0x16, (byte)0x08, (byte)0x09, (byte)0x6f, (byte)0x02, (byte)0x17, (byte)0x2b, (byte)0x08,
+                (byte)0x21, (byte)0x21, (byte)0x0a, (byte)0x10, (byte)0x03, (byte)0x03, (byte)0x07, (byte)0x06
         };
         byte[] ivBytes = new byte[] {
-            (byte)0x0f, (byte)0x08, (byte)0x01, (byte)0x00, (byte)0x19, (byte)0x47, (byte)0x25, (byte)0xdc,
-            (byte)0x15, (byte)0xf5, (byte)0x17, (byte)0xe0, (byte)0xe1, (byte)0x15, (byte)0x0c, (byte)0x35
+                (byte)0x0f, (byte)0x08, (byte)0x01, (byte)0x00, (byte)0x19, (byte)0x47, (byte)0x25, (byte)0xdc,
+                (byte)0x15, (byte)0xf5, (byte)0x17, (byte)0xe0, (byte)0xe1, (byte)0x15, (byte)0x0c, (byte)0x35
         };
 
         byte[] salt = genSalt(user_id, encType);
@@ -174,12 +174,12 @@ public class KakaoDecrypt {
 
     public static String encrypt(int encType, String plaintext, long user_id) throws Exception {
         byte[] keyBytes = new byte[] {
-            (byte)0x16, (byte)0x08, (byte)0x09, (byte)0x6f, (byte)0x02, (byte)0x17, (byte)0x2b, (byte)0x08,
-            (byte)0x21, (byte)0x21, (byte)0x0a, (byte)0x10, (byte)0x03, (byte)0x03, (byte)0x07, (byte)0x06
+                (byte)0x16, (byte)0x08, (byte)0x09, (byte)0x6f, (byte)0x02, (byte)0x17, (byte)0x2b, (byte)0x08,
+                (byte)0x21, (byte)0x21, (byte)0x0a, (byte)0x10, (byte)0x03, (byte)0x03, (byte)0x07, (byte)0x06
         };
         byte[] ivBytes = new byte[] {
-            (byte)0x0f, (byte)0x08, (byte)0x01, (byte)0x00, (byte)0x19, (byte)0x47, (byte)0x25, (byte)0xdc,
-            (byte)0x15, (byte)0x5, (byte)0x17, (byte)0xe0, (byte)0xe1, (byte)0x15, (byte)0x0c, (byte)0x35
+                (byte)0x0f, (byte)0x08, (byte)0x01, (byte)0x00, (byte)0x19, (byte)0x47, (byte)0x25, (byte)0xdc,
+                (byte)0x15, (byte)0x5, (byte)0x17, (byte)0xe0, (byte)0xe1, (byte)0x15, (byte)0x0c, (byte)0x35
         };
 
         byte[] salt = genSalt(user_id, encType);
@@ -195,7 +195,7 @@ public class KakaoDecrypt {
         IvParameterSpec ivParameterSpec = new IvParameterSpec(ivBytes);
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, ivParameterSpec);
-        byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+        byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8)); // PKCS5Padding is default in java.
         return java.util.Base64.getEncoder().encodeToString(ciphertext);
     }
 }

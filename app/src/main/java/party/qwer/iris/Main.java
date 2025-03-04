@@ -67,7 +67,7 @@ public class Main {
         System.out.println("Message sender thread started");
 
         KakaoDB kakaoDb = new KakaoDB();
-        ObserverHelper observerHelper = new ObserverHelper();
+        ObserverHelper observerHelper = new ObserverHelper(); // observerHelper should be initialized after Configurable
 
         DBObserver dbObserver = new DBObserver(kakaoDb, observerHelper);
         dbObserver.startPolling();

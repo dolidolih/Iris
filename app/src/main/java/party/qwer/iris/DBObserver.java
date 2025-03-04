@@ -19,7 +19,11 @@ public class DBObserver {
                     observerHelper.checkChange(kakaoDb);
                     try {
                         long pollingInterval = Configurable.getInstance().getDbPollingRate();
-                        Thread.sleep(pollingInterval);
+                        if (pollingInterval > 0) {
+                            Thread.sleep(pollingInterval);
+                        } else {
+                            Thread.sleep(1000); // prevent too fast loop if rate is set to 0 or negative.
+                        }
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         System.err.println("Polling thread interrupted: " + e);

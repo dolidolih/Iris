@@ -1,4 +1,3 @@
-// HttpServer.java
 package party.qwer.iris;
 
 import org.json.JSONObject;
@@ -46,8 +45,10 @@ public class HttpServer {
         postEndpointHandlers.put("/query", this::handleQueryFunction);
         postEndpointHandlers.put("/decrypt", this::handleDecryptFunction);
         postEndpointHandlers.put("/config/endpoint", this::handlePostConfigEndpoint);
+        postEndpointHandlers.put("/config/botname", this::handlePostConfigBotName);
         postEndpointHandlers.put("/config/dbrate", this::handlePostConfigDbRate);
         postEndpointHandlers.put("/config/sendrate", this::handlePostConfigSendRate);
+        postEndpointHandlers.put("/config/botport", this::handlePostConfigBotPort);
 
         getEndpointHandlers.put("/config/info", this::handleConfigInfo);
         getEndpointHandlers.put("/config", this::handleConfigPage);
@@ -212,250 +213,8 @@ public class HttpServer {
     }
 
 
-    private String generateConfigPageHtml() {
-        Configurable config = Configurable.getInstance();
-        String html = "<!DOCTYPE html>\n" +
-                "<html lang=\"en\">\n" +
-                "<head>\n" +
-                "    <meta charset=\"UTF-8\">\n" +
-                "    <title>Iris Test UI</title>\n" +
-                "    <style>\n" +
-                "        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }\n" +
-                "        h1 { color: #333; }\n" +
-                "        .config-section { background-color: #fff; padding: 20px; margin-bottom: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }\n" +
-                "        .section { background-color: #fff; padding: 20px; margin-bottom: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }\n" +
-                "        label { display: block; margin-bottom: 5px; font-weight: bold; }\n" +
-                "        input[type='text'], input[type='number'], textarea, select { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }\n" +
-                "        button { background-color: #5cb85c; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; }\n" +
-                "        button:hover { background-color: #4cae4c; }\n" +
-                "        .status-section { margin-top: 20px; padding: 10px; border-radius: 5px; background-color: #e0e0e0; }\n" +
-                "        .status-good { color: green; }\n" +
-                "        .status-bad { color: red; }\n" +
-                "        .log-table { width: 100%; border-collapse: collapse; margin-top: 10px; }\n" +
-                "        .log-table th, .log-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }\n" +
-                "        .log-table th { background-color: #f0f0f0; }\n" +
-                "        #responseArea { white-space: pre-wrap; background-color: #eee; padding: 10px; border-radius: 4px; margin-top: 10px; }\n" +
-                "    </style>\n" +
-                "</head>\n" +
-                "<body>\n" +
-                "    <h1>Iris Test UI</h1>\n" +
-
-                "    <div class=\"config-section\">\n" +
-                "        <h2>Configurations</h2>\n" +
-
-                "        <div>\n" +
-                "            <h3>Web Server Endpoint</h3>\n" +
-                "            <label for=\"webServerEndpoint\">Current Endpoint:</label>\n" +
-                "            <input type=\"text\" id=\"webServerEndpoint\" value=\"" + config.getWebServerEndpoint() + "\" readonly>\n" +
-                "            <label for=\"newWebServerEndpoint\">New Endpoint:</label>\n" +
-                "            <input type=\"text\" id=\"newWebServerEndpoint\" placeholder=\"Enter new endpoint\">\n" +
-                "            <button onclick=\"updateConfig('endpoint', document.getElementById('newWebServerEndpoint').value)\">Update Endpoint</button>\n" +
-                "        </div>\n" +
-
-                "        <div>\n" +
-                "            <h3>DB Polling Rate</h3>\n" +
-                "            <label for=\"dbPollingRate\">Current Rate (ms):</label>\n" +
-                "            <input type=\"number\" id=\"dbPollingRate\" value=\"" + config.getDbPollingRate() + "\" readonly>\n" +
-                "            <label for=\"newDbPollingRate\">New Rate (ms):</label>\n" +
-                "            <input type=\"number\" id=\"newDbPollingRate\" placeholder=\"Enter new DB polling rate\">\n" +
-                "            <button onclick=\"updateConfig('dbrate', document.getElementById('newDbPollingRate').value)\">Update DB Rate</button>\n" +
-                "        </div>\n" +
-
-                "        <div>\n" +
-                "            <h3>Message Send Rate</h3>\n" +
-                "            <label for=\"messageSendRate\">Current Rate (ms):</label>\n" +
-                "            <input type=\"number\" id=\"messageSendRate\" value=\"" + config.getMessageSendRate() + "\" readonly>\n" +
-                "            <label for=\"newMessageSendRate\">New Rate (ms):</label>\n" +
-                "            <input type=\"number\" id=\"newMessageSendRate\" placeholder=\"Enter new message send rate\">\n" +
-                "            <button onclick=\"updateConfig('sendrate', document.getElementById('newMessageSendRate').value)\">Update Send Rate</button>\n" +
-                "        </div>\n" +
-                "    </div>\n" +
-
-
-                "    <div class=\"section\">\n" +
-                "        <h2>/reply Endpoint Test</h2>\n" +
-                "        <form id=\"replyForm\">\n" +
-                "            <label for=\"replyRoom\">Room ID:</label>\n" +
-                "            <input type=\"text\" id=\"replyRoom\" name=\"room\" required>\n" +
-
-                "            <label for=\"replyType\">Message Type:</label>\n" +
-                "            <select id=\"replyType\" name=\"type\">\n" +
-                "                <option value=\"text\">Text</option>\n" +
-                "                <option value=\"image\">Image (Base64)</option>\n" +
-                "                <option value=\"image_multiple\">Multiple Images (Base64 JSON Array)</option>\n" +
-                "            </select>\n" +
-
-                "            <label for=\"replyData\">Message Data:</label>\n" +
-                "            <textarea id=\"replyData\" name=\"data\" rows=\"4\" required></textarea>\n" +
-
-                "            <label for=\"replyRawJson\">Raw JSON Body (override above):</label>\n" +
-                "            <textarea id=\"replyRawJson\" name=\"rawJson\" rows=\"4\" placeholder='{\"room\": \"\", \"data\": \"\"}'></textarea>\n" +
-
-                "            <button type=\"button\" onclick=\"submitForm('/reply', 'replyForm', 'replyResponseArea')\">Send Reply</button>\n" +
-                "        </form>\n" +
-                "        <div id=\"replyResponseArea\"></div>\n" +
-                "    </div>\n" +
-
-                "    <div class=\"section\">\n" +
-                "        <h2>/query Endpoint Test</h2>\n" +
-                "        <form id=\"queryForm\">\n" +
-                "            <label for=\"querySql\">SQL Query:</label>\n" +
-                "            <textarea id=\"querySql\" name=\"query\" rows=\"4\" required></textarea>\n" +
-
-                "            <label for=\"queryBind\">Bind Parameters (JSON Array String, optional):</label>\n" +
-                "            <input type=\"text\" id=\"queryBind\" name=\"bind\" placeholder='[\"value1\", \"value2\"]'>\n" +
-
-                "            <label for=\"queryRawJson\">Raw JSON Body (override above):</label>\n" +
-                "            <textarea id=\"queryRawJson\" name=\"rawJson\" rows=\"4\" placeholder='{\"query\": \"SELECT * FROM chat_logs LIMIT 10\"}'></textarea>\n" +
-
-                "            <button type=\"button\" onclick=\"submitForm('/query', 'queryForm', 'queryResponseArea')\">Execute Query</button>\n" +
-                "        </form>\n" +
-                "        <div id=\"queryResponseArea\"></div>\n" +
-                "    </div>\n" +
-
-
-                "    <div class=\"status-section\">\n" +
-                "        <h2>Database Observation Status</h2>\n" +
-                "        <p id=\"dbStatus\">Checking status...</p>\n" +
-                "        <h3>Last Chat Logs</h3>\n" +
-                "        <div id=\"lastLogs\"></div>\n" +
-                "    </div>\n" +
-
-                "    <script>\n" +
-                "        document.addEventListener('DOMContentLoaded', function() {\n" +
-                "            fetchDbStatus();\n" +
-                "            setInterval(fetchDbStatus, 5000);\n" +
-                "        });\n" +
-
-                "        function fetchDbStatus() {\n" +
-                "            fetch('/config/dbstatus')\n" +
-                "                .then(response => response.json())\n" +
-                "                .then(data => {\n" +
-                "                    const dbStatusElement = document.getElementById('dbStatus');\n" +
-                "                    const lastLogsContainer = document.getElementById('lastLogs');\n" +
-                "                    lastLogsContainer.innerHTML = '';\n" +
-
-                "                    if (data.success && data.message) {\n" +
-                "                        if (data.message.isObserving) {\n" +
-                "                            dbStatusElement.textContent = data.message.statusMessage + \" ✅\";\n" +
-                "                            dbStatusElement.className = 'status-good';\n" +
-                "                        } else {\n" +
-                "                            dbStatusElement.textContent = data.message.statusMessage + \" ❌\";\n" +
-                "                            dbStatusElement.className = 'status-bad';\n" +
-                "                        }\n" +
-
-                "                        if (data.message.lastLogs && data.message.lastLogs.length > 0) {\n" +
-                "                            const table = document.createElement('table');\n" +
-                "                            table.className = 'log-table';\n" +
-                "                            const headerRow = table.insertRow();\n" +
-                "                            const headers = ['ID', 'Chat ID', 'User ID', 'Message', 'Created At'];\n" +
-                "                            headers.forEach(headerText => {\n" +
-                "                                const th = document.createElement('th');\n" +
-                "                                th.textContent = headerText;\n" +
-                "                                headerRow.appendChild(th);\n" +
-                "                            });\n" +
-
-                "                            data.message.lastLogs.forEach(log => {\n" +
-                "                                const row = table.insertRow();\n" +
-                "                                ['_id', 'chat_id', 'user_id', 'message', 'created_at'].forEach(key => {\n" +
-                "                                    const cell = row.insertCell();\n" +
-                "                                    cell.textContent = log[key] || '';\n" +
-                "                                });\n" +
-                "                            });\n" +
-                "                            lastLogsContainer.appendChild(table);\n" +
-                "                        } else {\n" +
-                "                            lastLogsContainer.textContent = 'No recent logs.';\n" +
-                "                        }\n" +
-
-
-                "                    } else {\n" +
-                "                        dbStatusElement.textContent = 'Error checking DB status ⚠️';\n" +
-                "                        dbStatusElement.className = 'status-bad';\n" +
-                "                    }\n" +
-                "                })\n" +
-                "                .catch(error => {\n" +
-                "                    console.error('Error fetching DB status:', error);\n" +
-                "                    const dbStatusElement = document.getElementById('dbStatus');\n" +
-                "                    dbStatusElement.textContent = 'Error checking DB status ⚠️';\n" +
-                "                    dbStatusElement.className = 'status-bad';\n" +
-                "                });\n" +
-                "        }\n" +
-
-
-                "        function submitForm(endpoint, formId, responseAreaId, postDataOverride) {\n" +
-                "            const form = document.getElementById(formId);\n" +
-                "            const responseArea = document.getElementById(responseAreaId);\n" +
-                "            if (responseArea) responseArea.textContent = 'Sending request...';\n" +
-
-                "            let formData = {};\n" +
-                "            if (postDataOverride) { // Use postDataOverride if provided\n" +
-                "                formData = postDataOverride;\n" +
-                "            } else {\n" +
-                "                let rawJsonTextarea = form ? form.querySelector('[name=\"rawJson\"]') : null;\n" +
-                "                let rawJson = rawJsonTextarea ? rawJsonTextarea.value.trim() : '';\n" +
-
-                "                if (rawJson) {\n" +
-                "                    try {\n" +
-                "                        formData = JSON.parse(rawJson);\n" +
-                "                    } catch (e) {\n" +
-                "                        if (responseArea) responseArea.textContent = 'Error parsing raw JSON: ' + e.message;\n" +
-                "                        return;\n" +
-                "                    }\n" +
-                "                } else if (form) {\n" +
-                "                    for (let element of form.elements) {\n" +
-                "                        if (element.name && element.name !== 'rawJson') {\n" +
-                "                            formData[element.name] = element.value;\n" +
-                "                        }\n" +
-                "                    }\n" +
-                "                }\n" +
-                "            }\n" +
-
-
-                "            fetch(endpoint, {\n" +
-                "                method: 'POST',\n" +
-                "                headers: {\n" +
-                "                    'Content-Type': 'application/json'\n" +
-                "                },\n" +
-                "                body: JSON.stringify(formData)\n" +
-                "            })\n" +
-                "            .then(response => response.json())\n" +
-                "            .then(data => {\n" +
-                "                if (responseArea) responseArea.textContent = JSON.stringify(data, null, 2);\n" +
-                "                if (endpoint.startsWith('/config/')) {\n" +
-                "                    if (data.success) {\n" +
-                "                         alert('Config updated successfully: ' + data.message);\n" +
-                "                         location.reload();\n" +
-                "                     } else {\n" +
-                "                         alert('Config update failed: ' + data.error);\n" +
-                "                     }\n" +
-                "                }\n" +
-                "            })\n" +
-                "            .catch(error => {\n" +
-                "                if (responseArea) responseArea.textContent = 'Error: ' + error.message;\n" +
-                "            });\n" +
-                "        }\n" +
-
-                "       function updateConfig(type, value) {\n" +
-                "            let url = '/config/' + type;\n" +
-                "            let postData = {};\n" +
-                "            if (type === 'endpoint') {\n" +
-                "                postData = { endpoint: value };\n" +
-                "            } else if (type === 'dbrate' || type === 'sendrate') {\n" +
-                "                postData = { rate: value };\n" +
-                "            }\n" +
-                "            submitForm(url, null, null, postData); \n" +
-                "        }\n" +
-
-
-                "    </script>\n" +
-                "    <div id=\"configResponseArea\" style=\"display:none;\"></div>"+
-                "</body>\n" +
-                "</html>";
-        return html;
-    }
-
     private String handleConfigPage(String requestPath) {
-        String html = generateConfigPageHtml();
+        String html = ConfigPageDocumentProvider.getDocument(Configurable.getInstance());
         return html;
     }
 
@@ -495,6 +254,16 @@ public class HttpServer {
         }
     }
 
+    private String handlePostConfigBotName(JSONObject requestJson) {
+        String botName = requestJson.optString("botname");
+        if (botName != null && !botName.isEmpty()) {
+            Configurable.getInstance().setBotName(botName);
+            return createSuccessResponse("Bot name updated to: " + botName);
+        } else {
+            return createErrorResponse("Bot name parameter missing or empty in request body.");
+        }
+    }
+
     private String handlePostConfigDbRate(JSONObject requestJson) {
         String rateStr = requestJson.optString("rate");
         if (rateStr != null && !rateStr.isEmpty()) {
@@ -523,6 +292,24 @@ public class HttpServer {
             }
         } else {
             return createErrorResponse("Rate parameter missing or empty in request body.");
+        }
+    }
+
+    private String handlePostConfigBotPort(JSONObject requestJson) {
+        String portStr = requestJson.optString("port");
+        if (portStr != null && !portStr.isEmpty()) {
+            try {
+                int port = Integer.parseInt(portStr);
+                if (port < 1 || port > 65535) {
+                    return createErrorResponse("Invalid port number. Port must be between 1 and 65535.");
+                }
+                Configurable.getInstance().setBotSocketPort(port);
+                return createSuccessResponse("Bot port updated to: " + port + ". Please restart server for changes to take effect.");
+            } catch (NumberFormatException e) {
+                return createErrorResponse("Invalid port format in request body. Port must be an integer.");
+            }
+        } else {
+            return createErrorResponse("Port parameter missing or empty in request body.");
         }
     }
 
