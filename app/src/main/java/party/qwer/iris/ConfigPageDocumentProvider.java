@@ -25,6 +25,7 @@ public class ConfigPageDocumentProvider {
                     .log-table th, .log-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                     .log-table th { background-color: #f0f0f0; }
                     #responseArea { white-space: pre-wrap; background-color: #eee; padding: 10px; border-radius: 4px; margin-top: 10px; }
+                    .config-notice { color: orange; font-weight: bold; margin-top: 10px; }
                 </style>
             </head>
             <body>
@@ -33,6 +34,14 @@ public class ConfigPageDocumentProvider {
                 <div class="config-section">
                     <h2>Configurations</h2>
 
+                    <div>
+                        <h3>Bot Name</h3>
+                        <label for="botName">Current Bot Name:</label>
+                        <input type="text" id="botName" value="CURRENT_BOT_NAME" readonly>
+                        <label for="newBotName">New Bot Name:</label>
+                        <input type="text" id="newBotName" placeholder="Enter new bot name">
+                        <button onclick="updateConfig('botname', document.getElementById('newBotName').value)">Update Bot Name</button>
+                    </div>
                     <div>
                         <h3>Web Server Endpoint</h3>
                         <label for="webServerEndpoint">Current Endpoint:</label>
@@ -58,6 +67,16 @@ public class ConfigPageDocumentProvider {
                         <label for="newMessageSendRate">New Rate (ms):</label>
                         <input type="number" id="newMessageSendRate" placeholder="Enter new message send rate">
                         <button onclick="updateConfig('sendrate', document.getElementById('newMessageSendRate').value)">Update Send Rate</button>
+                    </div>
+
+                    <div>
+                        <h3>Bot Port</h3>
+                        <label for="botPort">Current Port:</label>
+                        <input type="number" id="botPort" value="CURRENT_BOT_PORT" readonly>
+                        <label for="newBotPort">New Port:</label>
+                        <input type="number" id="newBotPort" placeholder="Enter new bot port">
+                        <button onclick="updateConfig('botport', document.getElementById('newBotPort').value)">Update Bot Port</button>
+                        <p class="config-notice">Notice: Server restart required for bot port changes to take effect.</p>
                     </div>
                 </div>
 
@@ -163,7 +182,7 @@ public class ConfigPageDocumentProvider {
                                     dbStatusElement.textContent = 'Error checking DB status ⚠️';
                                     dbStatusElement.className = 'status-bad';
                                 }
-                            })
+                             })
                             .catch(error => {
                                 console.error('Error fetching DB status:', error);
                                 const dbStatusElement = document.getElementById('dbStatus');
@@ -193,23 +212,30 @@ public class ConfigPageDocumentProvider {
                                     return;
                                 }
                             } else if (form) {
-                                const replyTypeElement = form.querySelector('[name="type"]');
-                                const replyDataElement = form.querySelector('[name="data"]');
-                                const messageType = replyTypeElement ? replyTypeElement.value : 'text'; // Default to text if type is not found
+                                if (endpoint === '/query') { // Specific handling for /query form
+                                    const querySqlElement = document.getElementById('querySql');
+                                    const queryBindElement = document.getElementById('queryBind');
+                                    formData['query'] = querySqlElement.value;
+                                    formData['bind'] = queryBindElement.value;
+                                } else { // Existing logic for other forms (like /reply)
+                                    const replyTypeElement = form.querySelector('[name="type"]');
+                                    const replyDataElement = form.querySelector('[name="data"]');
+                                    const messageType = replyTypeElement ? replyTypeElement.value : 'text'; // Default to text if type is not found
 
-                                if (messageType === 'image_multiple') {
-                                    formData['data'] = JSON.parse(replyDataElement.value); // Take the value as string for image_multiple - it's already JSON string
-                                } else {
-                                    formData['data'] = replyDataElement.value; // For other types, take value as string as well
-                                }
-
-                                for (let element of form.elements) {
-                                    if (element.name && element.name !== 'rawJson' && element.name !== 'data' && element.name !== 'type') { // Exclude 'data', 'type' and 'rawJson'
-                                        formData[element.name] = element.value;
+                                    if (messageType === 'image_multiple') {
+                                        formData['data'] = JSON.parse(replyDataElement.value); // Take the value as string for image_multiple - it's already JSON string
+                                    } else {
+                                        formData['data'] = replyDataElement.value; // For other types, take value as string as well
                                     }
-                                }
-                                if (replyTypeElement) { // Explicitly add type from dropdown
-                                    formData['type'] = replyTypeElement.value;
+
+                                    for (let element of form.elements) {
+                                        if (element.name && element.name !== 'rawJson' && element.name !== 'data' && element.name !== 'type') { // Exclude 'data', 'type' and 'rawJson'
+                                            formData[element.name] = element.value;
+                                        }
+                                    }
+                                    if (replyTypeElement) { // Explicitly add type from dropdown
+                                        formData['type'] = replyTypeElement.value;
+                                    }
                                 }
                             }
                         }
@@ -234,7 +260,7 @@ public class ConfigPageDocumentProvider {
                                      alert('Config update failed: ' + data.error);
                                  }
                             }
-                        })
+                         })
                         .catch(error => {
                             if (responseArea) responseArea.textContent = 'Error: ' + error.message;
                         });
@@ -245,8 +271,12 @@ public class ConfigPageDocumentProvider {
                         let postData = {};
                         if (type === 'endpoint') {
                             postData = { endpoint: value };
+                        } else if (type === 'botname') {
+                            postData = { botname: value };
                         } else if (type === 'dbrate' || type === 'sendrate') {
                             postData = { rate: value };
+                        } else if (type === 'botport') {
+                            postData = { port: value };
                         }
                         submitForm(url, null, null, postData);
                     }
@@ -274,8 +304,10 @@ public class ConfigPageDocumentProvider {
     public static String getDocument(Configurable config) {
         String html = CONFIG_PAGE_HTML;
         html = html.replace("CURRENT_WEB_ENDPOINT", config.getWebServerEndpoint());
+        html = html.replace("CURRENT_BOT_NAME", config.getBotName());
         html = html.replace("CURRENT_DB_RATE", String.valueOf(config.getDbPollingRate()));
         html = html.replace("CURRENT_SEND_RATE", String.valueOf(config.getMessageSendRate()));
+        html = html.replace("CURRENT_BOT_PORT", String.valueOf(config.getBotSocketPort()));
         return html;
     }
 }

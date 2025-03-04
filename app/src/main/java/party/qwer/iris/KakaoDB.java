@@ -30,7 +30,7 @@ public class KakaoDB {
         long botUserId;
         Cursor cursor = null;
         try {
-            String sql = "SELECT user_id FROM chat_logs WHERE v LIKE '%\"isMine\":true%' LIMIT 1;";
+            String sql = "SELECT user_id FROM chat_logs WHERE v LIKE '%\"isMine\":true%' ORDER BY _id DESC LIMIT 1;";
             cursor = db.rawQuery(sql, null);
             if (cursor != null && cursor.moveToFirst()) {
                 botUserId = cursor.getLong(0);

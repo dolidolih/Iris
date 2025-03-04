@@ -45,8 +45,10 @@ public class HttpServer {
         postEndpointHandlers.put("/query", this::handleQueryFunction);
         postEndpointHandlers.put("/decrypt", this::handleDecryptFunction);
         postEndpointHandlers.put("/config/endpoint", this::handlePostConfigEndpoint);
+        postEndpointHandlers.put("/config/botname", this::handlePostConfigBotName);
         postEndpointHandlers.put("/config/dbrate", this::handlePostConfigDbRate);
         postEndpointHandlers.put("/config/sendrate", this::handlePostConfigSendRate);
+        postEndpointHandlers.put("/config/botport", this::handlePostConfigBotPort);
 
         getEndpointHandlers.put("/config/info", this::handleConfigInfo);
         getEndpointHandlers.put("/config", this::handleConfigPage);
@@ -252,6 +254,16 @@ public class HttpServer {
         }
     }
 
+    private String handlePostConfigBotName(JSONObject requestJson) {
+        String botName = requestJson.optString("botname");
+        if (botName != null && !botName.isEmpty()) {
+            Configurable.getInstance().setBotName(botName);
+            return createSuccessResponse("Bot name updated to: " + botName);
+        } else {
+            return createErrorResponse("Bot name parameter missing or empty in request body.");
+        }
+    }
+
     private String handlePostConfigDbRate(JSONObject requestJson) {
         String rateStr = requestJson.optString("rate");
         if (rateStr != null && !rateStr.isEmpty()) {
@@ -280,6 +292,24 @@ public class HttpServer {
             }
         } else {
             return createErrorResponse("Rate parameter missing or empty in request body.");
+        }
+    }
+
+    private String handlePostConfigBotPort(JSONObject requestJson) {
+        String portStr = requestJson.optString("port");
+        if (portStr != null && !portStr.isEmpty()) {
+            try {
+                int port = Integer.parseInt(portStr);
+                if (port < 1 || port > 65535) {
+                    return createErrorResponse("Invalid port number. Port must be between 1 and 65535.");
+                }
+                Configurable.getInstance().setBotSocketPort(port);
+                return createSuccessResponse("Bot port updated to: " + port + ". Please restart server for changes to take effect.");
+            } catch (NumberFormatException e) {
+                return createErrorResponse("Invalid port format in request body. Port must be an integer.");
+            }
+        } else {
+            return createErrorResponse("Port parameter missing or empty in request body.");
         }
     }
 
