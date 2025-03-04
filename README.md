@@ -25,12 +25,15 @@ This project allows you to automate interactions with KakaoTalk, extract data fr
 *   **HTTP API for Remote Control:**
     *   Exposes a simple HTTP API to send messages, query the database, and decrypt messages.
     *   Control your KakaoTalk instance programmatically from other applications or scripts.
-*   **Configuration via JSON:**
-    *   Configuration settings (like bot ID, bot name, server port, web server endpoint, **database polling rate, and message send rate**) are loaded from a `config.json` file.
+*   **Configuration via Web UI and JSON (Fallback):**
+    *   Initial configuration settings (like bot name, server port, web server endpoint, database polling rate, and message send rate) can be set via a `config.json` file.
+    *   **Dynamically reconfigure Iris via a web UI at `/config` or using POST requests to `/config` endpoints.**
 *   **Decryption via HTTP and Query Responses:**
     *   Decrypt all relevant values when sending a database record to a web server and in `/query` responses, including message content, attachments, nicknames, and profile URLs.
 *   **Automatic Image Cleanup:**
     *   Periodically deletes old images (older than 24 hours) from the temporary image storage directory to save space.
+*   **Iris Control Script:**
+    *   Provides a shell script (`iris_control`) to easily start, stop, and check the status of the Iris service.
 
 ## Getting Started
 
@@ -38,7 +41,6 @@ This project allows you to automate interactions with KakaoTalk, extract data fr
 
 *   **Android Device:** This application is designed to run on an Android device where KakaoTalk is installed and you have the necessary permissions to access system services and application data.
 *   **Root Access:** Accessing KakaoTalk's database and some system services might require root access on your Android device, depending on your Android version and security settings.
-*   **`config.json`:**  A `config.json` file needs to be placed in `/data/local/tmp/` on your Android device.
 *   **HTTP Server:** An HTTP server is required to interact with Iris.
 
 ### Setup
@@ -49,8 +51,8 @@ This project allows you to automate interactions with KakaoTalk, extract data fr
     cd Iris
     ```
 
-2.  **Configure `config.json`:**
-    Create a `config.json` file and place it in `/data/local/tmp/` on your Android device. The file should have the following structure:
+2.  **Initial Configuration (Optional):**
+    Optionally, create a `config.json` file and place it in `/data/local/tmp/` on your Android device for initial settings. If `config.json` is not found, Iris will use default values, which can be configured later via the web UI. The file should have the following structure:
 
     ```json
     {
@@ -68,24 +70,22 @@ This project allows you to automate interactions with KakaoTalk, extract data fr
     *   `message_send_rate` (optional): The minimum interval in milliseconds between sending KakaoTalk messages (e.g., `100`). Use this to control the message sending rate and avoid flooding.
 
 3.  **Copy files:**
-    Use adb to copy files into your Android environment.
+    Use adb to copy the Iris dex file into your Android environment.
     ```bash
     adb push Iris.dex /data/local/tmp
-    adb push config.json /data/local/tmp
     ```
 
 4.  **Run the dex file:**
     If you run it as a service, (Iris will be run in background although you pressed CTRL+C)
     ```bash
-    adb shell "su root sh -c 'CLASSPATH=/data/local/tmp/Iris.dex /system/bin/app_process / Iris' &"
+    adb shell 'su root sh -c "CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.iris.Main" &'
     ```
     If you want to run it and watch the logs, (Iris will stops when you press CTRL+C)
     ```bash
     adb shell
     su
-    sh -c 'CLASSPATH=/data/local/tmp/Iris.dex /system/bin/app_process / Iris'
+    su root sh -c 'CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.iris.Main'
     ```
-
 
 ### Usage
 
@@ -93,10 +93,10 @@ Once the application is running on your Android device, you can interact with it
 
 #### HTTP API Endpoints
 
-The HTTP server listens on the port specified in your `config.json` (`bot_http_port`).  All requests should be sent as `POST` requests with `Content-Type: application/json`.
+The HTTP server listens on the port specified in your `config.json` (or default `3000` if not configured, `bot_http_port`).  All requests should be sent as `POST` requests with `Content-Type: application/json` unless specified otherwise.
 
 *   **`/reply`**: Send a message or photo to a KakaoTalk chat room.
-    
+
     **Request Body (JSON):**
 
     ```json
@@ -121,7 +121,7 @@ The HTTP server listens on the port specified in your `config.json` (`bot_http_p
     ```
 
 *   **`/query`**: Execute an SQL query on the KakaoTalk database. This method automatically decrypts encrypted data fields in the response.
-    > If `message` or `attachment` are queried with `user_id` and `enc`, it will return decrypted value.  
+    > If `message` or `attachment` are queried with `user_id` and `enc`, it will return decrypted value.
     > If `nickname`, `profile_image_url`, `full_profile_image_url`, or `original_profile_image_url` are queried with `enc`, it will also return the plain text.
 
     **Request Body (JSON):**
@@ -218,35 +218,20 @@ The HTTP server listens on the port specified in your `config.json` (`bot_http_p
     }
     ```
 
-##### Configuration API Endpoints (GET)
+#### Configuration API Endpoints
 
-The following endpoints allow you to dynamically reconfigure Iris without restarting the application. These are accessed using `GET` requests.
-
-*   **`/config/endpoint?endpoint=[YOUR_WEB_SERVER_URL]`**: Update the web server endpoint for message forwarding.
+*   **`/config` (GET)**: Access the web UI to configure Iris settings. Open this URL in your web browser to view and modify configurations.
 
     **Example:**
 
     ```bash
-    curl http://[YOUR_DEVICE_IP]:[bot_http_port]/config/endpoint?endpoint=http://192.168.1.100:5000/new_messages
+    # Open in your web browser
+    http://[YOUR_DEVICE_IP]:[bot_http_port]/config
     ```
 
-*   **`/config/dbrate?rate=[DATABASE_POLLING_INTERVAL_IN_MILLISECONDS]`**: Update the database polling rate. Adjusting this value changes how frequently Iris checks for new messages in the database. Lower values increase CPU usage but may provide more immediate message detection.
+    This endpoint serves a web page that allows you to view current settings and update configurations like web server endpoint, database polling rate, and message send rate through a user-friendly interface.
 
-    **Example:**
-
-    ```bash
-    curl http://[YOUR_DEVICE_IP]:[bot_http_port]/config/dbrate?rate=300
-    ```
-
-*   **`/config/sendrate?rate=[MESSAGE_SEND_INTERVAL_IN_MILLISECONDS]`**: Update the message send rate. This controls the minimum interval between sending messages to KakaoTalk, helping to manage send frequency.
-
-    **Example:**
-
-    ```bash
-    curl http://[YOUR_DEVICE_IP]:[bot_http_port]/config/sendrate?rate=200
-    ```
-
-*   **`/config/info`**: Retrieve the current configuration as a JSON response. This is useful for verifying the currently active settings.
+*   **`/config/info` (GET)**: Retrieve the current configuration as a JSON response. This is useful for verifying the currently active settings.
 
     **Example:**
 
@@ -267,9 +252,107 @@ The following endpoints allow you to dynamically reconfigure Iris without restar
     }
     ```
 
-#### API Reference for Message Forwarding
+*   **`/config/endpoint` (POST)**: Update the web server endpoint for message forwarding.
 
-When Iris detects a new message in the KakaoTalk database, it sends a `POST` request to the `web_server_endpoint` configured in `config.json`. The request body is a JSON object with the following structure:
+    **Request Body (JSON):**
+
+    ```json
+    {
+      "endpoint": "[YOUR_WEB_SERVER_URL]"
+    }
+    ```
+
+    **Example:**
+
+    ```bash
+    curl -X POST -H "Content-Type: application/json" -d '{"endpoint": "http://192.168.1.100:5000/new_messages"}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/endpoint
+    ```
+
+*   **`/config/dbrate` (POST)**: Update the database polling rate. Adjusting this value changes how frequently Iris checks for new messages in the database. Lower values increase CPU usage but may provide more immediate message detection.
+
+    **Request Body (JSON):**
+
+    ```json
+    {
+      "rate": [DATABASE_POLLING_INTERVAL_IN_MILLISECONDS]
+    }
+    ```
+
+    **Example:**
+
+    ```bash
+    curl -X POST -H "Content-Type: application/json" -d '{"rate": 300}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/dbrate
+    ```
+
+*   **`/config/sendrate` (POST)**: Update the message send rate. This controls the minimum interval between sending messages to KakaoTalk, helping to manage send frequency.
+
+    **Request Body (JSON):**
+
+    ```json
+    {
+      "rate": [MESSAGE_SEND_INTERVAL_IN_MILLISECONDS]
+    }
+    ```
+
+    **Example:**
+
+    ```bash
+    curl -X POST -H "Content-Type: application/json" -d '{"rate": 200}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/sendrate
+    ```
+*   **`/config/botport` (POST)**: Update the bot HTTP server port. **Note**: This change requires a server restart to take effect.
+
+    **Request Body (JSON):**
+
+    ```json
+    {
+      "port": [NEW_PORT_NUMBER]
+    }
+    ```
+
+    **Example:**
+
+    ```bash
+    curl -X POST -H "Content-Type: application/json" -d '{"port": 3001}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/botport
+    ```
+
+#### Iris Control Script (`iris_control`)
+
+The `iris_control` shell script provides a convenient way to manage the Iris service.
+
+1.  **Copy `iris_control` to your Android device:**
+    ```bash
+    adb push iris_control /data/local/tmp/
+    ```
+
+2.  **Make it executable:**
+    ```bash
+    adb shell "su root chmod +x /data/local/tmp/iris_control"
+    ```
+
+3.  **Usage:**
+    Execute the script using `adb shell` with one of the following commands: `status`, `start`, or `stop`.
+
+    *   **Check Status:**
+        ```bash
+        adb shell "su root /data/local/tmp/iris_control status"
+        ```
+        This command will print whether Iris is currently running and its PID if it is active, or indicate if it's not running.
+
+    *   **Start Iris:**
+        ```bash
+        adb shell "su root /data/local/tmp/iris_control start"
+        ```
+        This command starts the Iris service in the background.
+
+    *   **Stop Iris:**
+        ```bash
+        adb shell "su root /data/local/tmp/iris_control stop"
+        ```
+        This command stops the running Iris service.
+
+##### API Reference for Message Forwarding
+
+When Iris detects a new message in the KakaoTalk database, it sends a `POST` request to the `web_server_endpoint` configured in `config.json` or via the `/config/endpoint` API. The request body is a JSON object with the following structure:
 
 ```json
 {
@@ -286,13 +369,3 @@ When Iris detects a new message in the KakaoTalk database, it sends a `POST` req
     // ... other columns from chat_logs table ...
   }
 }
-```
-
-## Credits
-
-*   **SendMsg & Initial Concept:** Based on the work of `ye-seola/go-kdb`.
-*   **KakaoTalk Decryption Logic:** Decryption methods from `jiru/kakaodecrypt`.
-
-## Disclaimer
-
-This project is provided for educational and research purposes only. The developers are not responsible for any misuse or damage caused by this software. Use it at your own risk and ensure you comply with all applicable laws and terms of service.
