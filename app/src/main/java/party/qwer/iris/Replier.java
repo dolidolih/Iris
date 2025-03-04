@@ -22,7 +22,7 @@ public class Replier {
     private static final IActivityManager activityManager = IActivityManager.Stub.asInterface(binder);
     private static final String NOTI_REF = Main.NOTI_REF;
     private static final BlockingQueue<SendMessageRequest> messageQueue = new LinkedBlockingQueue<>();
-    public static long messageSendRate = Configurable.getInstance().getMessageSendRate();
+    public static long messageSendRate = Configurable.getInstance().getMessageSendRate(); // load initial value from config
 
     interface SendMessageRequest {
         void send() throws Exception;
