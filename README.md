@@ -23,15 +23,18 @@ This project allows you to automate interactions with KakaoTalk, extract data fr
     ```
 
 3**Run the dex file:**
-    Make iris_control executable.
+    Make iris_control executable.  
+
     ```bash
     chmod +x iris_control
-    ```
+    ```  
     
-    To run, use iris_control
+    To run, use iris_control  
+
     ```bash
     iris_control start
-    ```
+    ```  
+
     iris_control has start/status/stop commands.
 
 ### Usage
@@ -40,7 +43,7 @@ Once the application is running on your Android device, you can interact with it
 
 #### HTTP API Endpoints
 
-The HTTP server listens on the port `/config` (default `3000`).  All requests should be sent as `POST` requests with `Content-Type: application/json` unless specified otherwise.
+All requests should be sent as `POST` requests with `Content-Type: application/json` unless specified otherwise.
 
 *   **`/reply`**: Send a message or photo to a KakaoTalk chat room.
 
