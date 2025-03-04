@@ -77,13 +77,13 @@ This project allows you to automate interactions with KakaoTalk, extract data fr
 4.  **Run the dex file:**
     If you run it as a service, (Iris will be run in background although you pressed CTRL+C)
     ```bash
-    adb shell "su root sh -c 'CLASSPATH=/data/local/tmp/Iris.dex /system/bin/app_process / Iris' &"
+    adb shell 'su root sh -c "CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.iris.Main" &'
     ```
     If you want to run it and watch the logs, (Iris will stops when you press CTRL+C)
     ```bash
     adb shell
     su
-    sh -c 'CLASSPATH=/data/local/tmp/Iris.dex /system/bin/app_process / Iris'
+    su root sh -c 'CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.iris.Main'
     ```
 
 
@@ -96,7 +96,7 @@ Once the application is running on your Android device, you can interact with it
 The HTTP server listens on the port specified in your `config.json` (`bot_http_port`).  All requests should be sent as `POST` requests with `Content-Type: application/json`.
 
 *   **`/reply`**: Send a message or photo to a KakaoTalk chat room.
-    
+
     **Request Body (JSON):**
 
     ```json
