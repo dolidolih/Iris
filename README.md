@@ -22,19 +22,18 @@ This project allows you to automate interactions with KakaoTalk, extract data fr
     adb push Iris.dex /data/local/tmp
     ```
 
-3**Run the dex file:**
+3.  **Run the dex file:**
+    
     Make iris_control executable.  
-
     ```bash
     chmod +x iris_control
     ```  
     
     To run, use iris_control  
-
     ```bash
     iris_control start
     ```  
-
+    
     iris_control has start/status/stop commands.
 
 ### Usage
@@ -266,7 +265,7 @@ All requests should be sent as `POST` requests with `Content-Type: application/j
     ```
 ##### API Reference for Message Forwarding
 
-When Iris detects a new message in the KakaoTalk database, it sends a `POST` request to the `web_server_endpoint` configured in `config.json` or via the `/config/endpoint` API. The request body is a JSON object with the following structure:
+When Iris detects a new message in the KakaoTalk database, it sends a `POST` request to the `web_server_endpoint` configured in `/config` or via the `/config/endpoint` API. The request body is a JSON object with the following structure:
 
 ```json
 {
@@ -283,11 +282,13 @@ When Iris detects a new message in the KakaoTalk database, it sends a `POST` req
     // ... other columns from chat_logs table ...
   }
 }
+```
 
-### Credits
-- SendMsg & Initial Concept: Based on the work of ye-seola/go-kdb.
+## Credits
 
-- KakaoTalk Decryption Logic: Decryption methods from jiru/kakaodecrypt.
+*   **SendMsg & Initial Concept:** Based on the work of `ye-seola/go-kdb`.
+*   **KakaoTalk Decryption Logic:** Decryption methods from `jiru/kakaodecrypt`.
 
-### Disclaimer
+## Disclaimer
+
 This project is provided for educational and research purposes only. The developers are not responsible for any misuse or damage caused by this software. Use it at your own risk and ensure you comply with all applicable laws and terms of service.
