@@ -126,12 +126,22 @@ public class HttpServer {
             String requestPath = requestParts[1];
 
 
+            //after
             if ("POST".equals(method)) {
                 String contentType = null;
+                int contentLength = -1; // Initialize to -1 to indicate not found yet
+
                 String line;
                 while ((line = in.readLine()) != null && !line.isEmpty()) {
                     if (line.toLowerCase().startsWith("content-type: ")) {
                         contentType = line.substring("Content-Type: ".length()).trim();
+                    } else if (line.toLowerCase().startsWith("content-length: ")) {
+                        try {
+                            contentLength = Integer.parseInt(line.substring("Content-Length: ".length()).trim());
+                        } catch (NumberFormatException e) {
+                            sendBadRequestResponse(out, "Invalid Content-Length format");
+                            return;
+                        }
                     }
                 }
 
@@ -140,30 +150,37 @@ public class HttpServer {
                     return;
                 }
 
-                StringBuilder requestBody = new StringBuilder();
-                while (in.ready()) {
-                    requestBody.append((char) in.read());
+                if (contentLength < 0) { // Check if Content-Length was provided
+                    sendBadRequestResponse(out, "Content-Length header is missing for POST request");
+                    return;
                 }
+
+                StringBuilder requestBody = new StringBuilder();
+                int bytesRead = 0;
+                try {
+                    while (bytesRead < contentLength) {
+                        int bytesToRead = Math.min(1024, contentLength - bytesRead); // Read in chunks of 1024 or less
+                        char[] buffer = new char[bytesToRead];
+                        int read = in.read(buffer, 0, bytesToRead);
+                        if (read == -1) { // Connection closed prematurely
+                            sendBadRequestResponse(out, "Connection closed before reading full Content-Length");
+                            return;
+                        }
+                        requestBody.append(buffer, 0, read);
+                        bytesRead += read;
+                    }
+                } catch (IOException e) {
+                    sendInternalServerErrorResponse(out, "IO error reading request body: " + e.getMessage());
+                    return;
+                }
+
+
                 String requestBodyString = requestBody.toString();
 
                 String responseString = handleHttpRequestLogic(requestPath, requestBodyString);
                 sendOkResponse(out, responseString, "application/json");
-            } else if ("GET".equals(method)) {
-                String responseString = handleHttpGetRequest(requestPath);
-                if (responseString.startsWith("HTTP/1.1")) {
-                    out.print(responseString);
-                    out.flush();
-                } else {
-                    String contentType = "text/html";
-                    if (requestPath.endsWith(".json")) {
-                        contentType = "application/json";
-                    }
-                    sendOkResponse(out, responseString, contentType);
-                }
-            } else {
-                sendBadRequestResponse(out, "Method not supported: " + method);
-            }
 
+            }
 
         } catch (IOException e) {
             System.err.println("IO Exception in client connection: " + e);
