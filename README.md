@@ -14,7 +14,7 @@ This project allows you to automate interactions with KakaoTalk, extract data fr
 
 ### Setup
 
-1.  **Download latest Iris file in [Releases](https://github.com/dolidolih/Iris/releases):**
+1.  **Download latest Iris in [Releases](https://github.com/dolidolih/Iris/releases):**
 
 2.  **Copy files:**
     Use adb to copy the Iris dex file into your Android environment.
