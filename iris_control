@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IRIS_PROCESS_NAME="Iris"
+IRIS_PROCESS_NAME="qwer"
 IRIS_PROCESS_KEYWORD="app_process"
 IRIS_START_COMMAND="adb shell 'su root sh -c \"CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.iris.Main > /dev/null 2>&1\"' &"
 
