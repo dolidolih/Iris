@@ -2,38 +2,7 @@
 
 This project allows you to automate interactions with KakaoTalk, extract data from its database, and control it remotely via an HTTP server. It's built in Java and designed to run on Android devices, leveraging system services and direct database access.
 
-**Project Status:** Work in Progress (WIP)
-
-## Features
-
-*   **Send Messages:**
-    *   Send text messages to KakaoTalk chat rooms directly from your application or via HTTP requests.
-    *   Send photos to KakaoTalk chat rooms (base64 encoded images supported via HTTP).
-    *   Messages are sent via a queue system to manage send rate, respecting configured delays.
-*   **Decrypt KakaoTalk Messages:**
-    *   Decrypt encrypted messages from the KakaoTalk database.
-    *   Provides an HTTP endpoint to decrypt messages on demand.
-*   **KakaoTalk Database Query:**
-    *   Execute arbitrary SQL queries against the KakaoTalk database via HTTP requests.
-    *   Supports single and **bulk SQL queries** in one request.
-    *   Supports **parameterized queries using bindings** to prevent SQL injection and improve efficiency.
-    *   Retrieve data such as chat logs, user information, and more (depending on database schema).
-*   **Real-time Message Monitoring:**
-    *   Monitors the KakaoTalk database for new messages.
-    *   Automatically decrypts and forwards new messages to a configurable web server via HTTP POST requests.
-    *   **Sends detailed message information including decrypted content, sender, and room name to the web server.**
-*   **HTTP API for Remote Control:**
-    *   Exposes a simple HTTP API to send messages, query the database, and decrypt messages.
-    *   Control your KakaoTalk instance programmatically from other applications or scripts.
-*   **Configuration via Web UI and JSON (Fallback):**
-    *   Initial configuration settings (like bot name, server port, web server endpoint, database polling rate, and message send rate) can be set via a `config.json` file.
-    *   **Dynamically reconfigure Iris via a web UI at `/config` or using POST requests to `/config` endpoints.**
-*   **Decryption via HTTP and Query Responses:**
-    *   Decrypt all relevant values when sending a database record to a web server and in `/query` responses, including message content, attachments, nicknames, and profile URLs.
-*   **Automatic Image Cleanup:**
-    *   Periodically deletes old images (older than 24 hours) from the temporary image storage directory to save space.
-*   **Iris Control Script:**
-    *   Provides a shell script (`iris_control`) to easily start, stop, and check the status of the Iris service.
+**Project Status:** Beta
 
 ## Getting Started
 
@@ -45,47 +14,25 @@ This project allows you to automate interactions with KakaoTalk, extract data fr
 
 ### Setup
 
-1.  **Clone the repository(or Download Released file):**
-    ```bash
-    git clone https://github.com/dolidolih/Iris.git
-    cd Iris
-    ```
+1.  **Download latest Iris file in [Releases](https://github.com/dolidolih/Iris/releases):**
 
-2.  **Initial Configuration (Optional):**
-    Optionally, create a `config.json` file and place it in `/data/local/tmp/` on your Android device for initial settings. If `config.json` is not found, Iris will use default values, which can be configured later via the web UI. The file should have the following structure:
-
-    ```json
-    {
-      "bot_name": "[YOUR_BOT_NAME]",
-      "bot_http_port": [PORT_FOR_HTTP_SERVER],
-      "web_server_endpoint": "[YOUR_WEB_SERVER_URL_FOR_MESSAGE_FORWARDING],
-      "db_polling_rate": [DATABASE_POLLING_INTERVAL_IN_MILLISECONDS], // Optional, default 100ms
-      "message_send_rate": [MESSAGE_SEND_INTERVAL_IN_MILLISECONDS]    // Optional, default 50ms
-    }
-    ```
-    *   `bot_name`: A name for your bot (used for identification).
-    *   `bot_http_port`: The port number for the HTTP server to listen on (e.g., `3000`).
-    *   `web_server_endpoint`: The URL of your web server that will receive new KakaoTalk messages (e.g., `http://172.17.0.2:5000/db for IrisPy`).
-    *   `db_polling_rate` (optional):  The interval in milliseconds to check for database changes (e.g., `200`). Lower values mean more frequent checks, potentially increasing CPU usage.
-    *   `message_send_rate` (optional): The minimum interval in milliseconds between sending KakaoTalk messages (e.g., `100`). Use this to control the message sending rate and avoid flooding.
-
-3.  **Copy files:**
+2.  **Copy files:**
     Use adb to copy the Iris dex file into your Android environment.
     ```bash
     adb push Iris.dex /data/local/tmp
     ```
 
-4.  **Run the dex file:**
-    If you run it as a service, (Iris will be run in background although you pressed CTRL+C)
+3**Run the dex file:**
+    Make iris_control executable.
     ```bash
-    adb shell 'su root sh -c "CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.iris.Main" &'
+    chmod +x iris_control
     ```
-    If you want to run it and watch the logs, (Iris will stops when you press CTRL+C)
+    
+    To run, use iris_control
     ```bash
-    adb shell
-    su
-    su root sh -c 'CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.iris.Main'
+    iris_control start
     ```
+    iris_control has start/status/stop commands.
 
 ### Usage
 
@@ -93,7 +40,7 @@ Once the application is running on your Android device, you can interact with it
 
 #### HTTP API Endpoints
 
-The HTTP server listens on the port specified in your `config.json` (or default `3000` if not configured, `bot_http_port`).  All requests should be sent as `POST` requests with `Content-Type: application/json` unless specified otherwise.
+The HTTP server listens on the port `/config` (default `3000`).  All requests should be sent as `POST` requests with `Content-Type: application/json` unless specified otherwise.
 
 *   **`/reply`**: Send a message or photo to a KakaoTalk chat room.
 
@@ -200,7 +147,7 @@ The HTTP server listens on the port specified in your `config.json` (or default 
     {
       "enc": [ENCRYPTION_TYPE], // Encryption type (integer from database)
       "b64_ciphertext": "[BASE64_ENCODED_CIPHERTEXT]", // Base64 encoded encrypted message
-      "user_id": [USER_ID] // User ID (long integer), optional, defaults to bot_id from config
+      "user_id": [USER_ID] // User ID (long integer)
     }
     ```
 
@@ -314,42 +261,6 @@ The HTTP server listens on the port specified in your `config.json` (or default 
     ```bash
     curl -X POST -H "Content-Type: application/json" -d '{"port": 3001}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/botport
     ```
-
-#### Iris Control Script (`iris_control`)
-
-The `iris_control` shell script provides a convenient way to manage the Iris service.
-
-1.  **Copy `iris_control` to your Android device:**
-    ```bash
-    adb push iris_control /data/local/tmp/
-    ```
-
-2.  **Make it executable:**
-    ```bash
-    adb shell "su root chmod +x /data/local/tmp/iris_control"
-    ```
-
-3.  **Usage:**
-    Execute the script using `adb shell` with one of the following commands: `status`, `start`, or `stop`.
-
-    *   **Check Status:**
-        ```bash
-        adb shell "su root /data/local/tmp/iris_control status"
-        ```
-        This command will print whether Iris is currently running and its PID if it is active, or indicate if it's not running.
-
-    *   **Start Iris:**
-        ```bash
-        adb shell "su root /data/local/tmp/iris_control start"
-        ```
-        This command starts the Iris service in the background.
-
-    *   **Stop Iris:**
-        ```bash
-        adb shell "su root /data/local/tmp/iris_control stop"
-        ```
-        This command stops the running Iris service.
-
 ##### API Reference for Message Forwarding
 
 When Iris detects a new message in the KakaoTalk database, it sends a `POST` request to the `web_server_endpoint` configured in `config.json` or via the `/config/endpoint` API. The request body is a JSON object with the following structure:
@@ -369,3 +280,11 @@ When Iris detects a new message in the KakaoTalk database, it sends a `POST` req
     // ... other columns from chat_logs table ...
   }
 }
+
+### Credits
+- SendMsg & Initial Concept: Based on the work of ye-seola/go-kdb.
+
+- KakaoTalk Decryption Logic: Decryption methods from jiru/kakaodecrypt.
+
+### Disclaimer
+This project is provided for educational and research purposes only. The developers are not responsible for any misuse or damage caused by this software. Use it at your own risk and ensure you comply with all applicable laws and terms of service.
