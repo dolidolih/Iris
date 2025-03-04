@@ -18,8 +18,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+
 import android.database.Cursor;
 import android.database.sqlite.SQLiteException;
+
 import java.util.function.Function;
 import java.io.InputStream;
 
@@ -174,27 +176,26 @@ public class HttpServer {
                     return;
                 }
 
-
                 String requestBodyString = requestBody.toString();
 
                 String responseString = handleHttpRequestLogic(requestPath, requestBodyString);
                 sendOkResponse(out, responseString, "application/json");
 
             } else if ("GET".equals(method)) {
-            String responseString = handleHttpGetRequest(requestPath);
-            if (responseString.startsWith("HTTP/1.1")) {
-                out.print(responseString);
-                out.flush();
-            } else {
-                String contentType = "text/html";
-                if (requestPath.endsWith(".json")) {
-                    contentType = "application/json";
+                String responseString = handleHttpGetRequest(requestPath);
+                if (responseString.startsWith("HTTP/1.1")) {
+                    out.print(responseString);
+                    out.flush();
+                } else {
+                    String contentType = "text/html";
+                    if (requestPath.endsWith(".json")) {
+                        contentType = "application/json";
+                    }
+                    sendOkResponse(out, responseString, contentType);
                 }
-                sendOkResponse(out, responseString, contentType);
+            } else {
+                sendBadRequestResponse(out, "Method not supported: " + method);
             }
-        } else {
-            sendBadRequestResponse(out, "Method not supported: " + method);
-        }
 
         } catch (IOException e) {
             System.err.println("IO Exception in client connection: " + e);
@@ -418,8 +419,7 @@ public class HttpServer {
                     imageBase64List.add(dataArray.getString(i));
                 }
                 Replier.SendMultiplePhotos(Long.parseLong(room), imageBase64List);
-            }
-            else {
+            } else {
                 Replier.SendMessage(NOTI_REF, Long.parseLong(room), data);
             }
             return createSuccessResponse();
