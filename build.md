@@ -10,7 +10,7 @@
 2. Build - Make Project
 
 ### cmdline에서 빌드
-1. ./gradlew build 
+1. ./gradlew build
 
 ### cmdline에서 빌드 (윈도우)
 1. .\gradlew.bat build
@@ -19,5 +19,5 @@
 1. `output/Iris-{buildType}.dex`를 장치로 옮깁니다.
 2. 아래 명령어를 장치에서 실행합니다.
 ```shell
-CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.Iris.Main
+CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.iris.Main
 ```
