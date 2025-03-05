@@ -3,13 +3,54 @@
 IRIS_PROCESS_NAME="qwer"
 IRIS_PROCESS_KEYWORD="app_process"
 IRIS_START_COMMAND="adb shell 'su root sh -c \"CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.iris.Main > /dev/null 2>&1\"' &"
+IRIS_DEX_URL="https://github.com/dolidolih/Iris/releases/download/v0.13/Iris.dex"
+IRIS_DEX_PATH="/data/local/tmp/Iris.dex"
+IRIS_DEX_LOCAL_FILE="Iris.dex"
+
+check_adb_installed() {
+  if ! command -v adb &> /dev/null
+  then
+    echo "adb is not installed. Please install adb and add it to your PATH."
+    echo "You can usually install it with your system's package manager (e.g., apt install adb, brew install android-platform-tools)."
+    return 1
+  fi
+  return 0
+}
+
+check_adb_device() {
+  adb devices > /dev/null 2>&1
+  adb devices | grep -q "device"
+  if [ $? -ne 0 ]; then
+    echo "No device found. Please ensure your Android device is connected via USB or network."
+    read -p "If using network, enter device IP address: " device_ip
+    if [ -n "$device_ip" ]; then
+      adb connect "$device_ip"
+      sleep 3
+      adb devices | grep -q "device"
+      if [ $? -ne 0 ]; then
+        echo "Failed to connect to device at $device_ip. Please check IP and device status."
+        return 1
+      else
+        echo "Successfully connected to device at $device_ip."
+        return 0
+      fi
+    else
+      echo "No device IP provided. Please connect a device."
+      return 1
+    fi
+  else
+    return 0
+  fi
+}
 
 get_iris_pid() {
+  check_adb_device || return 1
   pid=$(adb shell ps -f | grep "$IRIS_PROCESS_NAME" | grep "$IRIS_PROCESS_KEYWORD" | grep -v 'sh -c' | awk '{print $2}')
   echo "$pid"
 }
 
 iris_status() {
+  check_adb_device || return 1
   pid=$(get_iris_pid)
   if [ -n "$pid" ]; then
     echo "Iris is working. PID: $pid"
@@ -19,13 +60,14 @@ iris_status() {
 }
 
 iris_start() {
+  check_adb_device || return 1
   pid=$(get_iris_pid)
   if [ -n "$pid" ]; then
     echo "Iris is already running."
   else
     echo "Starting Iris service..."
-    eval "$IRIS_START_COMMAND" # Use eval to execute the command string
-    sleep 2 # Give it some time to start up. Adjust if needed.
+    eval "$IRIS_START_COMMAND"
+    sleep 2
     new_pid=$(get_iris_pid)
     if [ -n "$new_pid" ]; then
       echo "Iris service started. PID: $new_pid"
@@ -36,11 +78,12 @@ iris_start() {
 }
 
 iris_stop() {
+  check_adb_device || return 1
   pid=$(get_iris_pid)
   if [ -n "$pid" ]; then
     echo "Stopping Iris service..."
     adb shell "su root sh -c 'kill -s SIGKILL $pid'"
-    sleep 1 # Give it some time to stop. Adjust if needed.
+    sleep 1
     stopped_pid=$(get_iris_pid)
     if [ -z "$stopped_pid" ]; then
       echo "Iris service stopped."
@@ -52,6 +95,37 @@ iris_stop() {
   fi
 }
 
+iris_install() {
+  check_adb_installed || return 1
+  check_adb_device || return 1
+
+  echo "Downloading Iris.dex..."
+  if curl -Lo "$IRIS_DEX_LOCAL_FILE" "$IRIS_DEX_URL"; then
+    echo "Download completed."
+  elif wget -O "$IRIS_DEX_LOCAL_FILE" "$IRIS_DEX_URL"; then
+    echo "Download completed."
+  else
+    echo "Failed to download Iris.dex. Please check the URL and your internet connection."
+    return 1
+  fi
+
+  echo "Pushing Iris.dex to device..."
+  adb push "$IRIS_DEX_LOCAL_FILE" "$IRIS_DEX_PATH"
+  if [ $? -ne 0 ]; then
+    echo "Failed to push Iris.dex to /data/local/tmp. Check adb connection and permissions."
+    return 1
+  fi
+
+  echo "Verifying installation..."
+  adb shell "ls $IRIS_DEX_PATH" > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    echo "Installation completed!"
+  else
+    echo "Installation verification failed. File might not be in /data/local/tmp."
+  fi
+}
+
+
 case "$1" in
   status)
     iris_status
@@ -62,8 +136,11 @@ case "$1" in
   stop)
     iris_stop
     ;;
+  install)
+    iris_install
+    ;;
   *)
-    echo "Usage: $0 {status|start|stop}"
+    echo "Usage: $0 {status|start|stop|install}"
     exit 1
     ;;
 esac
