@@ -1,8 +1,15 @@
 [versions]
 agp = "8.8.2"
+kotlin = "2.1.10"
+ktorVersion = "3.1.1"
 
 [libraries]
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktorVersion" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktorVersion" }
+ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktorVersion" }
+ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktorVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 

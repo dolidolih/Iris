@@ -3,13 +3,14 @@
 
 package party.qwer.iris;
 
+import android.app.IActivityManager;
 import android.os.IBinder;
 import android.os.ServiceManager;
-import android.app.IActivityManager;
+
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.File;
 import java.io.FileReader;
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 
@@ -77,7 +78,7 @@ public class Main {
         imageDeleter.startDeletion();
         System.out.println("ImageDeleter started, and will delete images older than 1 hour.");
 
-        HttpServer httpServer = new HttpServer(kakaoDb, dbObserver, observerHelper);
+        HttpServerKt httpServer = new HttpServerKt(kakaoDb, dbObserver, observerHelper, NOTI_REF);
         httpServer.startServer();
         System.out.println("HTTP Server started");
 

@@ -1,13 +1,14 @@
 package party.qwer.iris;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.ArrayList;
-import java.util.List;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class KakaoDB {
     private SQLiteDatabase db = null;
@@ -217,5 +218,23 @@ public class KakaoDB {
 
     public SQLiteDatabase getConnection() {
         return this.db;
+    }
+
+    public List<Map<String, Object>> executeQuery(String sqlQuery, String[] bindArgs) {
+        List<Map<String, Object>> resultList = new ArrayList<>();
+        try (Cursor cursor = getConnection().rawQuery(sqlQuery, bindArgs)) {
+            if (cursor != null) {
+                String[] columnNames = cursor.getColumnNames();
+                while (cursor.moveToNext()) {
+                    Map<String, Object> row = new HashMap<>();
+                    for (String columnName : columnNames) {
+                        int columnIndex = cursor.getColumnIndexOrThrow(columnName);
+                        row.put(columnName, cursor.getString(columnIndex));
+                    }
+                    resultList.add(row);
+                }
+            }
+        }
+        return resultList;
     }
 }
