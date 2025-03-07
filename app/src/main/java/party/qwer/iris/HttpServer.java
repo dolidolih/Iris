@@ -13,6 +13,7 @@ import java.net.URLDecoder;
 import java.io.UnsupportedEncodingException;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -111,7 +112,8 @@ public class HttpServer {
         PrintWriter out = null;
         try {
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
-            out = new PrintWriter(clientSocket.getOutputStream(), true);
+            //out = new PrintWriter(clientSocket.getOutputStream(), true);
+            out = new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8), true);
 
             String requestLine = in.readLine();
             if (requestLine == null) {
@@ -164,9 +166,14 @@ public class HttpServer {
                         int bytesToRead = Math.min(1024, contentLength - bytesRead); // Read in chunks of 1024 or less
                         char[] buffer = new char[bytesToRead];
                         int read = in.read(buffer, 0, bytesToRead);
-                        if (read == -1) { // Connection closed prematurely
-                            sendBadRequestResponse(out, "Connection closed before reading full Content-Length");
-                            return;
+                        if(read == -1){// Connection closed prematurely
+                            if(requestBody.toString().getBytes().length == contentLength){
+                                System.out.println("read all request body, but by encoded body length measure failure, content length is incorrect.");
+                                break;
+                            }else{
+                                sendBadRequestResponse(out, "Connection closed before reading full Content-Length");
+                                return;
+                            }
                         }
                         requestBody.append(buffer, 0, read);
                         bytesRead += read;
@@ -672,5 +679,6 @@ public class HttpServer {
         out.println("Connection: close");
         out.println();
         out.println(responseBody);
+        out.flush();
     }
 }
