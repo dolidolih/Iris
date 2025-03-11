@@ -1,61 +1,59 @@
-package party.qwer.iris;
+package party.qwer.iris
 
-import java.io.File;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.io.File
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.Volatile
 
-public class ImageDeleter {
-    private final String imageDirPath;
-    private final long deletionInterval;
-    private volatile boolean running = true;
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+class ImageDeleter(private val imageDirPath: String, private val deletionInterval: Long) {
+    @Volatile
+    private var running = true
+    private val scheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
 
-    public ImageDeleter(String imageDirPath, long deletionInterval) {
-        this.imageDirPath = imageDirPath;
-        this.deletionInterval = deletionInterval;
+    fun startDeletion() {
+        scheduler.scheduleWithFixedDelay(
+            { this.deleteOldImages() }, 0,
+            deletionInterval, TimeUnit.MILLISECONDS
+        )
     }
 
-    public void startDeletion() {
-        scheduler.scheduleWithFixedDelay(this::deleteOldImages, 0, deletionInterval, TimeUnit.MILLISECONDS);
-    }
-
-    public void stopDeletion() {
-        running = false;
-        scheduler.shutdown();
+    fun stopDeletion() {
+        running = false
+        scheduler.shutdown()
         try {
             if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-                scheduler.shutdownNow();
+                scheduler.shutdownNow()
             }
-        } catch (InterruptedException e) {
-            scheduler.shutdownNow();
-            Thread.currentThread().interrupt();
-            System.err.println("Error shutting down image deletion scheduler: " + e);
+        } catch (e: InterruptedException) {
+            scheduler.shutdownNow()
+            Thread.currentThread().interrupt()
+            System.err.println("Error shutting down image deletion scheduler: $e")
         }
     }
 
-    private void deleteOldImages() {
+    private fun deleteOldImages() {
         if (!running) {
-            System.out.println("Image deletion task stopped.");
-            scheduler.shutdown();
-            return;
+            println("Image deletion task stopped.")
+            scheduler.shutdown()
+            return
         }
 
-        File imageDir = new File(imageDirPath);
-        if (!imageDir.exists() || !imageDir.isDirectory()) {
-            System.out.println("Image directory does not exist: " + imageDirPath);
-            return;
+        val imageDir = File(imageDirPath)
+        if (!imageDir.exists() || !imageDir.isDirectory) {
+            println("Image directory does not exist: $imageDirPath")
+            return
         }
 
-        long oneDayAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1);
-        File[] files = imageDir.listFiles();
+        val oneDayAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1)
+        val files = imageDir.listFiles()
         if (files != null) {
-            for (File file : files) {
-                if (file.isFile() && file.lastModified() < oneDayAgo) {
+            for (file in files) {
+                if (file.isFile && file.lastModified() < oneDayAgo) {
                     if (file.delete()) {
-                        System.out.println("Deleted old image file: " + file.getName());
+                        println("Deleted old image file: " + file.name)
                     } else {
-                        System.err.println("Failed to delete image file: " + file.getName());
+                        System.err.println("Failed to delete image file: " + file.name)
                     }
                 }
             }

@@ -1,60 +1,55 @@
-package party.qwer.iris;
+package party.qwer.iris
 
-public class DBObserver {
-    private final KakaoDB kakaoDb;
-    private final ObserverHelper observerHelper;
-    private Thread pollingThread;
-    private volatile boolean isObservingDatabase = false;
+import party.qwer.iris.Configurable.dbPollingRate
+import kotlin.concurrent.Volatile
 
-    public DBObserver(KakaoDB kakaoDb, ObserverHelper observerHelper) {
-        this.kakaoDb = kakaoDb;
-        this.observerHelper = observerHelper;
-    }
+class DBObserver(private val kakaoDb: KakaoDB, private val observerHelper: ObserverHelper) {
+    private var pollingThread: Thread? = null
 
-    public void startPolling() {
-        if (pollingThread == null || !pollingThread.isAlive()) {
-            pollingThread = new Thread(() -> {
-                isObservingDatabase = true;
+    @Volatile
+    var isObserving: Boolean = false
+        private set
+
+    fun startPolling() {
+        if (pollingThread == null || !pollingThread!!.isAlive) {
+            pollingThread = Thread {
+                isObserving = true
                 while (true) {
-                    observerHelper.checkChange(kakaoDb);
+                    observerHelper.checkChange(kakaoDb)
                     try {
-                        long pollingInterval = Configurable.getInstance().getDbPollingRate();
+                        val pollingInterval =
+                            dbPollingRate
                         if (pollingInterval > 0) {
-                            Thread.sleep(pollingInterval);
+                            Thread.sleep(pollingInterval)
                         } else {
-                            Thread.sleep(1000); // prevent too fast loop if rate is set to 0 or negative.
+                            Thread.sleep(1000)
                         }
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        System.err.println("Polling thread interrupted: " + e);
-                        isObservingDatabase = false;
-                        break;
+                    } catch (e: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        System.err.println("Polling thread interrupted: $e")
+                        isObserving = false
+                        break
                     }
                 }
-                isObservingDatabase = false;
-            });
-            pollingThread.setName("DB-Polling-Thread");
-            pollingThread.start();
-            System.out.println("DB Polling thread started.");
+                isObserving = false
+            }
+            pollingThread!!.name = "DB-Polling-Thread"
+            pollingThread!!.start()
+            println("DB Polling thread started.")
         } else {
-            System.out.println("DB Polling thread is already running.");
+            println("DB Polling thread is already running.")
         }
     }
 
-    public void stopPolling() {
-        if (pollingThread != null && pollingThread.isAlive()) {
-            pollingThread.interrupt();
-            pollingThread = null;
-            isObservingDatabase = false;
-            System.out.println("DB Polling thread stopped.");
+    fun stopPolling() {
+        if (pollingThread != null && pollingThread!!.isAlive) {
+            pollingThread!!.interrupt()
+            pollingThread = null
+            isObserving = false
+            println("DB Polling thread stopped.")
         }
     }
 
-    public boolean isPollingThreadAlive() {
-        return pollingThread != null && pollingThread.isAlive();
-    }
-
-    public boolean isObserving() {
-        return isObservingDatabase;
-    }
+    val isPollingThreadAlive: Boolean
+        get() = pollingThread != null && pollingThread!!.isAlive
 }

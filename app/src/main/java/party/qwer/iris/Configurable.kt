@@ -1,155 +1,106 @@
-package party.qwer.iris;
+package party.qwer.iris
 
-import org.json.JSONObject;
-import org.json.JSONException;
-import java.io.BufferedReader;
-import java.io.PrintWriter;
-import java.io.IOException;
-import java.io.FileReader;
-import java.io.FileOutputStream;
-import java.nio.charset.StandardCharsets;
-import java.io.OutputStreamWriter;
-
-public class Configurable {
-    private static Configurable instance;
-    private static JSONObject config;
-    private static long BOT_ID_CONFIG = 0L; // default value, will be loaded from DB later or remain 0 if not found
-    private static String BOT_NAME_CONFIG = "Iris"; // default bot name
-    private static int BOT_HTTP_PORT_CONFIG = 3000; // default port
-    private static String WEB_SERVER_ENDPOINT_CONFIG;
-    private static long DB_POLLING_RATE_CONFIG = 100;
-    private static long MESSAGE_SEND_RATE_CONFIG = 50;
-    private static final String CONFIG_FILE_PATH = "/data/local/tmp/config.json";
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
+import java.io.File
+import java.io.IOException
+import party.qwer.iris.model.ConfigValues
 
 
-    private Configurable() {}
+object Configurable {
+    private const val CONFIG_FILE_PATH = "/data/local/tmp/config.json"
+    private var configValues : ConfigValues = ConfigValues()
 
-    public static synchronized Configurable getInstance() {
-        if (instance == null) {
-            instance = new Configurable();
-        }
-        return instance;
+    private val json = Json {
+        encodeDefaults = true
     }
 
-    public void loadConfig(String configFile) { // configFile is CONFIG_FILE_PATH
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new FileReader(configFile))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-            config = new JSONObject(sb.toString());
-        } catch (IOException e) {
-            System.out.println("config.json not found, creating default config.");
-            config = createDefaultConfig();
-            saveConfig(); // save default config to file
-        } catch (JSONException e) {
-            System.err.println("JSON parsing error in config.json, creating default config: " + e);
-            config = createDefaultConfig();
-            saveConfig(); // save default config to file
+    init {
+        loadConfig()
+    }
+
+    private fun loadConfig() {
+        val configFile = File(CONFIG_FILE_PATH)
+        if (!configFile.exists()) {
+            println("config.json not found, creating default config.")
+            saveConfig()
+            return
         }
+
         try {
-            BOT_NAME_CONFIG = config.optString("bot_name", BOT_NAME_CONFIG); // Use default if not found
-            BOT_HTTP_PORT_CONFIG = config.optInt("bot_http_port", BOT_HTTP_PORT_CONFIG); // Use default if not found
-            WEB_SERVER_ENDPOINT_CONFIG = config.optString("web_server_endpoint", "http://172.17.0.1:5000/db"); // Default endpoint
-            if (config.has("db_polling_rate")) {
-                DB_POLLING_RATE_CONFIG = config.getLong("db_polling_rate");
-            }
-            if (config.has("message_send_rate")) {
-                MESSAGE_SEND_RATE_CONFIG = config.getLong("message_send_rate");
-            }
-
-        } catch (JSONException e) {
-            System.err.println("Error reading config values from JSON, using defaults: " + e);
+            val jsonString = configFile.readText()
+            println("jsonString from file: $jsonString")
+            configValues = json.decodeFromString(ConfigValues.serializer(), jsonString)
+        } catch (e: IOException) {
+            println("Error reading config.json, creating default config: ${e.message}")
+            saveConfig() // save default config to file
+        } catch (e: SerializationException) {
+            System.err.println("JSON parsing error in config.json, creating default config: ${e.message}")
+            saveConfig()
         }
     }
 
-    private JSONObject createDefaultConfig() {
-        JSONObject defaultConfig = new JSONObject();
+    private fun saveConfig() {
         try {
-            defaultConfig.put("bot_name", BOT_NAME_CONFIG);
-            defaultConfig.put("bot_http_port", BOT_HTTP_PORT_CONFIG);
-            defaultConfig.put("web_server_endpoint", "http://172.17.0.1:5000/db"); // Default endpoint
-            defaultConfig.put("db_polling_rate", DB_POLLING_RATE_CONFIG);
-            defaultConfig.put("message_send_rate", MESSAGE_SEND_RATE_CONFIG);
-        } catch (JSONException e) {
-            e.printStackTrace(); // Log if default config creation fails, though unlikely
-        }
-        return defaultConfig;
-    }
+            println("saveConfig: configValues before serialization: $configValues")
 
+            val jsonString = json.encodeToString(ConfigValues.serializer(), configValues)
+            println("saveConfig: jsonString: $jsonString")
 
-    private synchronized void saveConfig() {
-        try (FileOutputStream fos = new FileOutputStream(CONFIG_FILE_PATH);
-             PrintWriter writer = new PrintWriter(new OutputStreamWriter(fos, StandardCharsets.UTF_8))) {
-            writer.print(config.toString(4));
-        } catch (IOException e) {
-            System.err.println("Error writing config to file: " + e);
-        } catch (JSONException e) {
-            System.err.println("JSON error while saving config: " + e);
+            File(CONFIG_FILE_PATH).writeText(jsonString)
+        } catch (e: IOException) {
+            System.err.println("Error writing config to file: ${e.message}")
+        } catch (e: SerializationException) {
+            System.err.println("JSON error while saving config: ${e.message}")
         }
     }
 
-    public long getBotId() { return BOT_ID_CONFIG; }
-    public void setBotId(long botId) { BOT_ID_CONFIG = botId; }
-    public String getBotName() { return BOT_NAME_CONFIG; }
-    public synchronized void setBotName(String botName) {
-        BOT_NAME_CONFIG = botName;
-        try {
-            config.put("bot_name", botName);
-        } catch (JSONException e) {
-            System.err.println("JSON error updating bot_name in config: " + e);
+    var botId: Long
+        get() = configValues.botId
+        set(value) {
+            configValues.botId = value
+            saveConfig()
+            println("Bot Id is updated to: $botId")
         }
-        saveConfig();
-        System.out.println("Bot name updated to: " + BOT_NAME_CONFIG);
-    }
 
-
-    public int getBotSocketPort() { return BOT_HTTP_PORT_CONFIG; }
-    public synchronized void setBotSocketPort(int port) {
-        BOT_HTTP_PORT_CONFIG = port;
-        try {
-            config.put("bot_http_port", port);
-        } catch (JSONException e) {
-            System.err.println("JSON error updating bot_http_port in config: " + e);
+    var botName: String
+        get() = configValues.botName
+        set(value) {
+            configValues.botName = value
+            saveConfig()
+            println("Bot name updated to: $botName")
         }
-        saveConfig();
-        System.out.println("Bot port updated to: " + BOT_HTTP_PORT_CONFIG);
-    }
-    public String getWebServerEndpoint() { return WEB_SERVER_ENDPOINT_CONFIG; }
-    public long getDbPollingRate() { return DB_POLLING_RATE_CONFIG; }
-    public long getMessageSendRate() { return MESSAGE_SEND_RATE_CONFIG; }
 
-    public synchronized void setWebServerEndpoint(String endpoint) {
-        WEB_SERVER_ENDPOINT_CONFIG = endpoint;
-        try {
-            config.put("web_server_endpoint", endpoint);
-        } catch (JSONException e) {
-            System.err.println("JSON error updating web_server_endpoint in config: " + e);
+    var botSocketPort: Int
+        get() = configValues.botHttpPort
+        set(value) {
+            configValues.botHttpPort = value
+            saveConfig()
+            println("Bot port updated to: $botSocketPort")
         }
-        saveConfig();
-        System.out.println("WebServerEndpoint updated to: " + WEB_SERVER_ENDPOINT_CONFIG);
-    }
 
-    public synchronized void setDbPollingRate(long rate) {
-        DB_POLLING_RATE_CONFIG = rate;
-        try {
-            config.put("db_polling_rate", rate);
-        } catch (JSONException e) {
-            System.err.println("JSON error updating db_polling_rate in config: " + e);
+    var webServerEndpoint: String
+        get() = configValues.webServerEndpoint
+        set(value) {
+            configValues.webServerEndpoint = value
+            saveConfig()
+            println("WebServerEndpoint updated to: $webServerEndpoint")
         }
-        saveConfig();
-        System.out.println("DbPollingRate updated to: " + DB_POLLING_RATE_CONFIG);
-    }
 
-    public synchronized void setMessageSendRate(long rate) {
-        MESSAGE_SEND_RATE_CONFIG = rate;
-        try {
-            config.put("message_send_rate", rate);
-        } catch (JSONException e) {
-            System.err.println("JSON error updating message_send_rate in config: " + e);
+    var dbPollingRate: Long
+        get() = configValues.dbPollingRate
+        set(value) {
+            configValues.dbPollingRate = value
+            saveConfig()
+            println("DbPollingRate updated to: $dbPollingRate")
         }
-        saveConfig();
-        System.out.println("MessageSendRate updated to: " + MESSAGE_SEND_RATE_CONFIG);
-    }
+
+    var messageSendRate: Long
+        get() = configValues.messageSendRate
+        set(value) {
+            configValues.messageSendRate = value
+            saveConfig()
+            println("MessageSendRate updated to: $messageSendRate")
+        }
 }
