@@ -116,7 +116,7 @@ public class KakaoDB {
     }
 
 
-    public String[] getUserInfo(long chatId, long userId) {
+    public String[] getChatInfo(long chatId, long userId) {
         String sender;
         if (userId == Configurable.INSTANCE.getBotId()) {
             sender = Configurable.INSTANCE.getBotName();
@@ -131,7 +131,7 @@ public class KakaoDB {
             String[] selectionArgs = {String.valueOf(chatId)};
             cursor = db.rawQuery(sql, selectionArgs);
 
-            if (cursor != null && cursor.moveToNext()) {
+            if (cursor.moveToNext()) {
                 room = cursor.getString(0);
             }
         } catch (SQLiteException e) {
@@ -141,6 +141,7 @@ public class KakaoDB {
                 cursor.close();
             }
         }
+
         return new String[]{room, sender};
     }
 
@@ -170,13 +171,13 @@ public class KakaoDB {
     }
 
 
-    public Map<String, Object> logToDict(long logId) {
-        Map<String, Object> dict = new HashMap<>();
+    public Map<String, @Nullable String> logToDict(long logId) {
+        Map<String, @Nullable String> dict = new HashMap<>();
         Cursor cursor = null;
         try {
             String sql = "SELECT * FROM chat_logs ORDER BY _id DESC LIMIT 1";
             cursor = db.rawQuery(sql, null);
-            if (cursor != null && cursor.moveToNext()) {
+            if (cursor.moveToNext()) {
                 String[] columnNames = cursor.getColumnNames();
                 for (String columnName : columnNames) {
                     int columnIndex = cursor.getColumnIndexOrThrow(columnName);
