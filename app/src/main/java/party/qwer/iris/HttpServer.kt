@@ -22,11 +22,13 @@ import org.json.JSONException
 import org.json.JSONObject
 import party.qwer.iris.model.ApiResponse
 import party.qwer.iris.model.CommonErrorResponse
+import party.qwer.iris.model.ConfigRequest
+import party.qwer.iris.model.ConfigResponse
+import party.qwer.iris.model.DashboardStatusResponse
 import party.qwer.iris.model.DecryptRequest
 import party.qwer.iris.model.DecryptResponse
 import party.qwer.iris.model.ReplyRequest
 import party.qwer.iris.model.ReplyType
-import party.qwer.iris.model.ConfigRequest
 
 
 class HttpServerKt(
@@ -52,54 +54,35 @@ class HttpServerKt(
             }
 
             routing {
-                get("/config") {
-                    val html = ConfigPageDocumentProvider.renderPage()
+                get("/dashboard") {
+                    val html = PageRenderer.renderDashboard()
                     call.respondText(html, ContentType.Text.Html)
                 }
 
-                // TODO: 리팩
-                get("/config/dbstatus") {
-                    val statusJson = JSONObject()
-                    try {
-                        val isObserving = dbObserver.isObserving
-                        statusJson.put("isObserving", isObserving)
-                        if (isObserving) {
-                            statusJson.put("statusMessage", "Observing database")
-                        } else {
-                            statusJson.put("statusMessage", "Not observing database")
-                        }
-                        val lastLogsList = observerHelper.lastChatLogs
-                        val lastLogsJsonArray = JSONArray(lastLogsList)
-                        statusJson.put("lastLogs", lastLogsJsonArray)
-                    } catch (e: JSONException) {
-                        throw Exception("Failed to serialize DB status to JSON: $e")
-                    }
-
-                    call.respondText(
-                        JSONObject(
-                            mapOf(
-                                "success" to true, "message" to statusJson
-                            )
-                        ).toString(), contentType = ContentType.Application.Json
+                get("/config") {
+                    call.respond(
+                        ConfigResponse(
+                            bot_name = Configurable.botName,
+                            bot_http_port = Configurable.botSocketPort,
+                            web_server_endpoint = Configurable.webServerEndpoint,
+                            db_polling_rate = Configurable.dbPollingRate,
+                            message_send_rate = Configurable.messageSendRate,
+                            bot_id = Configurable.botId,
+                        )
                     )
                 }
 
-                get("/config/info") {
-                    val configJson = JSONObject()
-
-                    try {
-                        configJson.put("bot_name", Configurable.botName)
-                        configJson.put("bot_http_port", Configurable.botSocketPort)
-                        configJson.put("web_server_endpoint", Configurable.webServerEndpoint)
-                        configJson.put("db_polling_rate", Configurable.dbPollingRate)
-                        configJson.put("message_send_rate", Configurable.messageSendRate)
-                        configJson.put("bot_id", Configurable.botId)
-                    } catch (e: JSONException) {
-                        throw Exception("Failed to serialize DB status to JSON: $e")
-                    }
-
-                    call.respondText(
-                        configJson.toString(), contentType = ContentType.Application.Json
+                get("/dashboard/status") {
+                    call.respond(
+                        DashboardStatusResponse(
+                            isObserving = dbObserver.isObserving,
+                            statusMessage = if (dbObserver.isObserving) {
+                                "Observing database"
+                            }else {
+                                "Not observing database"
+                            },
+                            lastLogs = observerHelper.lastChatLogs
+                        )
                     )
                 }
 
@@ -125,22 +108,19 @@ class HttpServerKt(
                         }
 
                         "dbrate" -> {
-                            val value = req.rate
-                                ?: throw Exception("missing or invalid value")
+                            val value = req.rate ?: throw Exception("missing or invalid value")
 
                             Configurable.dbPollingRate = value
                         }
 
                         "sendrate" -> {
-                            val value = req.rate
-                                ?: throw Exception("missing or invalid value")
+                            val value = req.rate ?: throw Exception("missing or invalid value")
 
                             Configurable.messageSendRate = value
                         }
 
                         "botport" -> {
-                            val value  = req.port
-                                ?: throw Exception("missing or invalid value")
+                            val value = req.port ?: throw Exception("missing or invalid value")
 
                             if (value < 1 || value > 65535) {
                                 throw Exception("Invalid port number. Port must be between 1 and 65535.")
@@ -162,12 +142,11 @@ class HttpServerKt(
                     val roomId = replyRequest.room.toLong()
 
                     when (replyRequest.type) {
-                        ReplyType.TEXT -> Replier.sendMessage(
-                            notificationReferer, roomId, replyRequest.data.jsonPrimitive.content
+                        ReplyType.TEXT -> Replier.SendMessage(
+                            notificationReferer, roomId, replyRequest.data.jsonPrimitive.content,
                         )
-
-                        ReplyType.IMAGE -> Replier.sendPhoto(roomId, replyRequest.data.jsonPrimitive.content)
-                        ReplyType.IMAGE_MULTIPLE -> Replier.sendMultiplePhotos(
+                        ReplyType.IMAGE -> Replier.SendPhoto(roomId, replyRequest.data.jsonPrimitive.content)
+                        ReplyType.IMAGE_MULTIPLE -> Replier.SendMultiplePhotos(
                             roomId,
                             replyRequest.data.jsonArray.map { it.jsonPrimitive.content })
                     }
