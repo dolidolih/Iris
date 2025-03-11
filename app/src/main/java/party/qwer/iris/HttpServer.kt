@@ -36,7 +36,7 @@ class HttpServerKt(
     val notificationReferer: String
 ) {
     fun startServer() {
-        embeddedServer(Netty, port = 8080) {
+        embeddedServer(Netty, port = Configurable.botSocketPort) {
             install(ContentNegotiation) {
                 json()
             }
@@ -163,10 +163,10 @@ class HttpServerKt(
 
                     when (replyRequest.type) {
                         ReplyType.TEXT -> Replier.SendMessage(
-                            notificationReferer, roomId, replyRequest.data.toString()
+                            notificationReferer, roomId, replyRequest.data.jsonPrimitive.content
                         )
 
-                        ReplyType.IMAGE -> Replier.SendPhoto(roomId, replyRequest.data.toString())
+                        ReplyType.IMAGE -> Replier.SendPhoto(roomId, replyRequest.data.jsonPrimitive.content)
                         ReplyType.IMAGE_MULTIPLE -> Replier.SendMultiplePhotos(
                             roomId,
                             replyRequest.data.jsonArray.map { it.jsonPrimitive.content })
