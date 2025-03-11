@@ -17,24 +17,24 @@
 1.  **최신 Iris를 [Releases](https://github.com/dolidolih/Iris/releases)에서 다운로드하세요.**
 
 2.  **파일 복사:**
-    adb를 사용하여 Iris dex 파일을 안드로이드 환경에 복사하세요.
+    adb를 사용하여 Iris apk 파일을 안드로이드 환경에 복사하세요.
     ```bash
-    adb push Iris.dex /data/local/tmp
+    adb push Iris.apk /data/local/tmp
     ```
 
-3.  **dex 파일 실행:**
+3.  **apk 파일 실행:**
 
-    iris_control을 실행 가능하게 만드세요.
+    iris_control을 실행 가능하게 만드세요.(윈도우 이용자는 skip)
     ```bash
     chmod +x iris_control
     ```
 
-    실행하려면 iris_control을 사용하세요.
+    실행하려면 iris_control을 사용하세요.(윈도우 이용자는 ./iris_control.ps1)
     ```bash
     ./iris_control start
     ```
 
-    iris_control은 start/status/stop 명령어를 제공합니다.
+    iris_control은 install/start/status/stop 명령어를 제공합니다.
 
 4.  **Config 설정:**
 
