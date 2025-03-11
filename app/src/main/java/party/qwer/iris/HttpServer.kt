@@ -142,11 +142,11 @@ class HttpServerKt(
                     val roomId = replyRequest.room.toLong()
 
                     when (replyRequest.type) {
-                        ReplyType.TEXT -> Replier.SendMessage(
+                        ReplyType.TEXT -> Replier.sendMessage(
                             notificationReferer, roomId, replyRequest.data.jsonPrimitive.content,
                         )
-                        ReplyType.IMAGE -> Replier.SendPhoto(roomId, replyRequest.data.jsonPrimitive.content)
-                        ReplyType.IMAGE_MULTIPLE -> Replier.SendMultiplePhotos(
+                        ReplyType.IMAGE -> Replier.sendPhoto(roomId, replyRequest.data.jsonPrimitive.content)
+                        ReplyType.IMAGE_MULTIPLE -> Replier.sendMultiplePhotos(
                             roomId,
                             replyRequest.data.jsonArray.map { it.jsonPrimitive.content })
                     }
