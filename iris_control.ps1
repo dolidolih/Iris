@@ -12,10 +12,10 @@ param(
 
 $IRIS_PROCESS_NAME = "qwer"
 $IRIS_PROCESS_KEYWORD = "app_process"
-$IRIS_START_COMMAND = "adb shell 'su root sh -c `"CLASSPATH=/data/local/tmp/Iris.dex app_process / party.qwer.iris.Main`"' 2>&1"
-$IRIS_DEX_URL = "https://github.com/dolidolih/Iris/releases/download/v0.13/Iris.dex"
-$IRIS_DEX_PATH = "/data/local/tmp/Iris.dex"
-$IRIS_DEX_LOCAL_FILE = "Iris.dex"
+$IRIS_START_COMMAND = "adb shell 'su root sh -c `"CLASSPATH=/data/local/tmp/Iris.apk app_process / party.qwer.iris.Main`"' 2>&1"
+$IRIS_APK_URL = "https://github.com/dolidolih/Iris/releases/download/v0.14/Iris.apk"
+$IRIS_APK_PATH = "/data/local/tmp/Iris.apk"
+$IRIS_APK_LOCAL_FILE = "Iris.apk"
 
 function Check-AdbInstalled {
     if (!(Get-Command adb -ErrorAction SilentlyContinue)) {
@@ -73,7 +73,7 @@ function Iris-Start {
     } else {
         Write-Host "Starting Iris service..."
         $job = Start-Job -ScriptBlock {
-            adb shell "su root sh -c 'app_process -cp /data/local/tmp/Iris.dex / party.qwer.iris.Main'"
+            adb shell "su root sh -c 'app_process -cp /data/local/tmp/Iris.apk / party.qwer.iris.Main'"
         }
         Start-Sleep -Seconds 1
         Get-Job -Id $job.Id | Out-Null
@@ -108,24 +108,24 @@ function Iris-Install {
     if (!(Check-AdbInstalled)) { return }
     if (!(Check-AdbDevice)) { return }
 
-    Write-Host "Downloading Iris.dex..."
+    Write-Host "Downloading Iris.apk..."
     try {
-        Invoke-WebRequest -Uri $IRIS_DEX_URL -OutFile $IRIS_DEX_LOCAL_FILE
+        Invoke-WebRequest -Uri $IRIS_APK_URL -OutFile $IRIS_APK_LOCAL_FILE
         Write-Host "Download completed."
     } catch {
-        Write-Host "Failed to download Iris.dex. Please check the URL and your internet connection."
+        Write-Host "Failed to download Iris.apk. Please check the URL and your internet connection."
         return
     }
 
-    Write-Host "Pushing Iris.dex to device..."
-    adb push $IRIS_DEX_LOCAL_FILE $IRIS_DEX_PATH
+    Write-Host "Pushing Iris.apk to device..."
+    adb push $IRIS_APK_LOCAL_FILE $IRIS_APK_PATH
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "Failed to push Iris.dex to /data/local/tmp. Check adb connection and permissions."
+        Write-Host "Failed to push Iris.apk to /data/local/tmp. Check adb connection and permissions."
         return
     }
 
     Write-Host "Verifying installation..."
-    $verify_output = adb shell "ls $IRIS_DEX_PATH"
+    $verify_output = adb shell "ls $IRIS_APK_PATH"
     if ($LASTEXITCODE -eq 0) {
         Write-Host "Installation completed!"
     } else {
