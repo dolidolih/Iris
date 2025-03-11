@@ -1,13 +1,14 @@
 package party.qwer.iris;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.ArrayList;
-import java.util.List;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class KakaoDB {
     private SQLiteDatabase db = null;
@@ -35,7 +36,7 @@ public class KakaoDB {
             if (cursor != null && cursor.moveToFirst()) {
                 botUserId = cursor.getLong(0);
                 System.out.println("Bot user_id is detected: " + botUserId);
-                Configurable.getInstance().setBotId(botUserId);
+                Configurable.INSTANCE.setBotId(botUserId);
             } else {
                 System.err.println("Warning: Bot user_id not found in chat_logs with isMine:true. Decryption might not work correctly.");
             }
@@ -100,7 +101,7 @@ public class KakaoDB {
             if (cursor != null && cursor.moveToNext()) {
                 String row_name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                 String enc = cursor.getString(cursor.getColumnIndexOrThrow("enc"));
-                dec_row_name = KakaoDecrypt.decrypt(Integer.parseInt(enc), row_name, Configurable.getInstance().getBotId());
+                dec_row_name = KakaoDecrypt.decrypt(Integer.parseInt(enc), row_name, Configurable.INSTANCE.getBotId());
             }
 
         } catch (SQLiteException e) {
@@ -120,8 +121,8 @@ public class KakaoDB {
 
     public String[] getUserInfo(long chatId, long userId) {
         String sender;
-        if (userId == Configurable.getInstance().getBotId()) {
-            sender = Configurable.getInstance().getBotName();
+        if (userId == Configurable.INSTANCE.getBotId()) {
+            sender = Configurable.INSTANCE.getBotName();
         } else {
             sender = getNameOfUserId(userId);
         }
@@ -217,5 +218,23 @@ public class KakaoDB {
 
     public SQLiteDatabase getConnection() {
         return this.db;
+    }
+
+    public List<Map<String, Object>> executeQuery(String sqlQuery, String[] bindArgs) {
+        List<Map<String, Object>> resultList = new ArrayList<>();
+        try (Cursor cursor = getConnection().rawQuery(sqlQuery, bindArgs)) {
+            if (cursor != null) {
+                String[] columnNames = cursor.getColumnNames();
+                while (cursor.moveToNext()) {
+                    Map<String, Object> row = new HashMap<>();
+                    for (String columnName : columnNames) {
+                        int columnIndex = cursor.getColumnIndexOrThrow(columnName);
+                        row.put(columnName, cursor.getString(columnIndex));
+                    }
+                    resultList.add(row);
+                }
+            }
+        }
+        return resultList;
     }
 }

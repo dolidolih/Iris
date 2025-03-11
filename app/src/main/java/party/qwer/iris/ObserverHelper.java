@@ -2,7 +2,6 @@ package party.qwer.iris;
 
 import org.json.JSONObject;
 import org.json.JSONException;
-import org.json.JSONArray;
 
 import java.util.Collections;
 import java.util.Map;
@@ -25,7 +24,7 @@ import java.util.LinkedList;
 
 public class ObserverHelper {
     private long lastLogId = 0;
-    private final LinkedList<Map<String, Object>> lastDecryptedLogs = new LinkedList<>(); // Store last decrypted logs
+    private final LinkedList<Map<String, String>> lastDecryptedLogs = new LinkedList<>(); // Store last decrypted logs
     private static final int MAX_LOGS_STORED = 50; // Maximum number of logs to store
 
     private String makePostData(String decMsg, String room, String sender, JSONObject js) throws JSONException {
@@ -139,7 +138,7 @@ public class ObserverHelper {
                         String[] userInfo = db.getUserInfo(chat_id, user_id);
                         String room = userInfo[0];
                         String sender = userInfo[1];
-                        if (room.equals(Configurable.getInstance().getBotName())) {
+                        if (room.equals(Configurable.INSTANCE.getBotName())) {
                             room = sender;
                         }
                         String postData;
@@ -166,7 +165,7 @@ public class ObserverHelper {
     }
 
     private synchronized void storeDecryptedLog(Cursor cursor, String decryptedMessage) {
-        Map<String, Object> logEntry = new HashMap<>();
+        Map<String, String> logEntry = new HashMap<>();
         logEntry.put("_id", cursor.getString(cursor.getColumnIndexOrThrow("_id")));
         logEntry.put("chat_id", cursor.getString(cursor.getColumnIndexOrThrow("chat_id")));
         logEntry.put("user_id", cursor.getString(cursor.getColumnIndexOrThrow("user_id")));
@@ -184,14 +183,14 @@ public class ObserverHelper {
     }
 
 
-    public List<Map<String, Object>> getLastChatLogs() {
-        return new ArrayList<>(lastDecryptedLogs); // Return a copy to avoid external modification
+    public List<Map<String, String>> getLastChatLogs() { // Changed return type
+        return new ArrayList<>(lastDecryptedLogs);
     }
 
 
     // Modified sendPostRequest to fetch endpoint each time
     private void sendPostRequest(String jsonData) {
-        String urlStr = Configurable.getInstance().getWebServerEndpoint();
+        String urlStr = Configurable.INSTANCE.getWebServerEndpoint();
         System.out.println("Sending HTTP POST request to: " + urlStr);
         System.out.println("JSON Data being sent: " + jsonData);
         try {

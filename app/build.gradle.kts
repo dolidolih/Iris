@@ -1,10 +1,12 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "party.qwer.iris"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         minSdk = 26
@@ -30,6 +32,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+    packaging {
+        resources {
+            excludes += "META-INF/*"
+        }
+    }
 }
 
 android.applicationVariants.all {
@@ -40,13 +50,12 @@ android.applicationVariants.all {
         doLast {
             copy {
                 variant.outputs.forEach { output ->
-                    val file =
-                        zipTree(file(output.outputFile)).matching { include("classes*.dex") }.singleFile
+                    val file = output.outputFile
 
                     from(file)
                     into(outputPath)
                     rename { fileName ->
-                        fileName.replace(file.name, "Iris-${output.name}.dex")
+                        fileName.replace(file.name, "Iris-${output.name}.apk")
                     }
                 }
             }
@@ -54,6 +63,13 @@ android.applicationVariants.all {
     }
 }
 
+
 dependencies {
+    implementation(libs.androidx.core.ktx)
     compileOnly(files("libs/android-30.jar"))
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.ktor.server.netty)
+    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.ktor.server.status.pages)
 }
