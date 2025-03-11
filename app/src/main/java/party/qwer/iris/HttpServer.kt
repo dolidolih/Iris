@@ -1,6 +1,5 @@
 package party.qwer.iris
 
-import android.database.sqlite.SQLiteException
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -17,7 +16,6 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import party.qwer.iris.model.ApiResponse
@@ -27,6 +25,8 @@ import party.qwer.iris.model.ConfigResponse
 import party.qwer.iris.model.DashboardStatusResponse
 import party.qwer.iris.model.DecryptRequest
 import party.qwer.iris.model.DecryptResponse
+import party.qwer.iris.model.QueryRequest
+import party.qwer.iris.model.QueryResponse
 import party.qwer.iris.model.ReplyRequest
 import party.qwer.iris.model.ReplyType
 
@@ -78,7 +78,7 @@ class HttpServerKt(
                             isObserving = dbObserver.isObserving,
                             statusMessage = if (dbObserver.isObserving) {
                                 "Observing database"
-                            }else {
+                            } else {
                                 "Not observing database"
                             },
                             lastLogs = observerHelper.lastChatLogs
@@ -145,23 +145,33 @@ class HttpServerKt(
                         ReplyType.TEXT -> Replier.sendMessage(
                             notificationReferer, roomId, replyRequest.data.jsonPrimitive.content,
                         )
-                        ReplyType.IMAGE -> Replier.sendPhoto(roomId, replyRequest.data.jsonPrimitive.content)
-                        ReplyType.IMAGE_MULTIPLE -> Replier.sendMultiplePhotos(
-                            roomId,
+
+                        ReplyType.IMAGE -> Replier.sendPhoto(
+                            roomId, replyRequest.data.jsonPrimitive.content
+                        )
+
+                        ReplyType.IMAGE_MULTIPLE -> Replier.sendMultiplePhotos(roomId,
                             replyRequest.data.jsonArray.map { it.jsonPrimitive.content })
                     }
 
                     call.respond(ApiResponse(success = true, message = "success"))
                 }
 
-                // TODO: 리팩
                 post("/query") {
-                    val body = call.receive<String>()
+                    val queryRequest = call.receive<QueryRequest>()
 
-                    call.respondText(
-                        handleQueryFunction(JSONObject(body)),
-                        contentType = ContentType.Application.Json
-                    )
+                    try {
+                        val rows = kakaoDB.executeQuery(queryRequest.query,
+                            (queryRequest.bind?.map { it.content } ?: listOf()).toTypedArray())
+
+                        rows.forEach {
+                            decryptRow(it)
+                        }
+
+                        call.respond(QueryResponse(data = rows))
+                    } catch (e: Exception) {
+                        throw Exception("Query 오류: query=${queryRequest.query}, err=${e.message}")
+                    }
                 }
 
                 post("/decrypt") {
@@ -178,153 +188,75 @@ class HttpServerKt(
         }.start(wait = true)
     }
 
-    private fun createQuerySuccessResponse(queryResult: Any): String {
+    private fun decryptRow(row: MutableMap<String, String?>) {
         try {
-            val responseJson = JSONObject()
-            responseJson.put("success", true)
-            val dataArray = JSONArray()
-
-            if (queryResult is List<*>) {
-                val resultList = queryResult
-                if (!resultList.isEmpty() && resultList[0] is List<*>) {
-                    val bulkResults = queryResult as List<List<Map<String?, Any?>>>
-                    for (singleQueryResult in bulkResults) {
-                        val singleQueryDataArray = JSONArray()
-                        for (rowMap in singleQueryResult) {
-                            val rowJson = JSONObject(rowMap)
-                            processDecryptionForResponse(rowJson)
-                            singleQueryDataArray.put(rowJson)
-                        }
-                        dataArray.put(singleQueryDataArray)
-                    }
-                } else {
-                    val singleQueryResult = queryResult as List<Map<String?, Any?>>
-                    for (rowMap in singleQueryResult) {
-                        val rowJson = JSONObject(rowMap)
-                        processDecryptionForResponse(rowJson)
-                        dataArray.put(rowJson)
-                    }
-                }
-            }
-            responseJson.put("data", dataArray)
-            return responseJson.toString()
-        } catch (e: JSONException) {
-            throw Exception("Failed to create query success JSON response.")
-        }
-    }
-
-    private fun processDecryptionForResponse(rowJson: JSONObject) {
-        try {
-            if (rowJson.has("message") || rowJson.has("attachment")) {
-                val vStr = rowJson.optString("v")
-                if (!vStr.isEmpty()) {
+            if (row.contains("message") || row.contains("attachment")) {
+                val vStr = row.getOrDefault("v", "")
+                if (vStr?.isNotEmpty() == true) {
                     try {
                         val vJson = JSONObject(vStr)
                         val enc = vJson.optInt("enc", 0)
-                        val userId = rowJson.optLong("user_id", Configurable.botId)
-                        if (rowJson.has("message")) {
-                            val encryptedMessage = rowJson.getString("message")
-                            if (encryptedMessage.isEmpty() || encryptedMessage == "{}") {
-                            } else {
-                                rowJson.put(
-                                    "message", KakaoDecrypt.decrypt(enc, encryptedMessage, userId)
-                                )
+                        val userId = row.get("user_id")?.toLongOrNull() ?: Configurable.botId
+
+                        if (row.contains("message")) {
+                            val encryptedMessage = row.getOrDefault("message", "")
+                            if (encryptedMessage?.isNotEmpty() == true && encryptedMessage != "{}") {
+                                try {
+                                    row["message"] =
+                                        KakaoDecrypt.decrypt(enc, encryptedMessage, userId)
+                                } catch (e: Exception) {
+                                    System.err.println("Decryption error for message: $e")
+                                }
                             }
                         }
-                        if (rowJson.has("attachment")) {
-                            val encryptedAttachment = rowJson.getString("attachment")
-                            if (encryptedAttachment.isEmpty() || encryptedAttachment == "{}") {
-                            } else {
-                                rowJson.put(
-                                    "attachment",
+                        if (row.contains("attachment")) {
+                            val encryptedAttachment = row.getOrDefault("attachment", "")
+                            if (encryptedAttachment?.isNotEmpty() == true && encryptedAttachment != "{}") {
+                                try {
+                                    row["attachment"] =
+                                        KakaoDecrypt.decrypt(enc, encryptedAttachment, userId)
+                                } catch (e: Exception) {
+                                    System.err.println("Decryption error for attachment: $e")
+                                }
+                                row["attachment"] =
                                     KakaoDecrypt.decrypt(enc, encryptedAttachment, userId)
-                                )
                             }
                         }
                     } catch (e: JSONException) {
                         System.err.println("Error parsing 'v' for decryption: $e")
-                    } catch (e: java.lang.Exception) {
-                        System.err.println("Decryption error for message/attachment: $e")
                     }
                 }
             }
 
             val botId = Configurable.botId
-            val enc = rowJson.optInt("enc", 0)
-            if (rowJson.has("nickname")) {
+            val enc = row["enc"]?.toIntOrNull() ?: 0
+
+            if (row.contains("nickname")) {
                 try {
-                    val encryptedNickname = rowJson.getString("nickname")
-                    rowJson.put("nickname", KakaoDecrypt.decrypt(enc, encryptedNickname, botId))
-                } catch (e: java.lang.Exception) {
+                    val encryptedNickname = row.getOrDefault("nickname", "")
+                    row["nickname"] = KakaoDecrypt.decrypt(enc, encryptedNickname, botId)
+                } catch (e: Exception) {
                     System.err.println("Decryption error for nickname: $e")
                 }
             }
+
             val urlKeys =
                 arrayOf("profile_image_url", "full_profile_image_url", "original_profile_image_url")
+
             for (urlKey in urlKeys) {
-                if (rowJson.has(urlKey)) {
-                    val encryptedUrl = rowJson.optString(urlKey, "")
+                if (row.contains(urlKey)) {
+                    val encryptedUrl = row[urlKey]!!
                     if (encryptedUrl.isNotEmpty()) {
                         try {
-                            rowJson.put(urlKey, KakaoDecrypt.decrypt(enc, encryptedUrl, botId))
-                        } catch (e: java.lang.Exception) {
+                            row[urlKey] = KakaoDecrypt.decrypt(enc, encryptedUrl, botId)
+                        } catch (e: Exception) {
                             System.err.println("Decryption error for $urlKey: $e")
                         }
                     }
                 }
             }
-        } catch (e: java.lang.Exception) {
+        } catch (e: Exception) {
             System.err.println("JSON processing error during decryption: $e")
         }
-    }
-
-    private fun handleQueryFunction(obj: JSONObject): String {
-        try {
-            if (obj.has("queries")) {
-                val queriesArray = obj.getJSONArray("queries")
-                val bulkResults: MutableList<List<Map<String, Any>>> = ArrayList()
-                for (i in 0 until queriesArray.length()) {
-                    val queryObj = queriesArray.getJSONObject(i)
-                    val query = queryObj.getString("query")
-                    val bindValues: List<Any> = jsonArrayToList(queryObj.getJSONArray("bind"))
-                    val bindArgs = arrayOfNulls<String>(bindValues.size)
-                    for (j in bindValues.indices) {
-                        bindArgs[j] = bindValues[j].toString()
-                    }
-                    val queryResult: List<Map<String, Any>> = kakaoDB.executeQuery(query, bindArgs)
-                    bulkResults.add(queryResult)
-                }
-                return createQuerySuccessResponse(bulkResults)
-            } else {
-                val query = obj.getString("query")
-                val bindJsonArray = obj.optJSONArray("bind")
-                val bindValues =
-                    if ((bindJsonArray != null)) jsonArrayToList(bindJsonArray) else emptyList<Any>()
-                val bindArgs = arrayOfNulls<String>(bindValues.size)
-                for (i in bindValues.indices) {
-                    bindArgs[i] = bindValues[i].toString()
-                }
-                val queryResult: List<Map<String, Any>> = kakaoDB.executeQuery(query, bindArgs)
-                return createQuerySuccessResponse(queryResult)
-            }
-        } catch (e: JSONException) {
-            throw Exception("Invalid 'query' or 'queries' field for query function. $e")
-        } catch (e: ClassCastException) {
-            throw Exception("Invalid 'query' or 'queries' field for query function. $e")
-        } catch (e: SQLiteException) {
-            throw Exception("Database query error: $e")
-        } catch (e: java.lang.Exception) {
-            throw Exception("Error executing query: $e")
-        }
-    }
-
-    private fun jsonArrayToList(jsonArray: JSONArray?): List<Any> {
-        val list: MutableList<Any> = ArrayList()
-        if (jsonArray != null) {
-            for (i in 0 until jsonArray.length()) {
-                list.add(jsonArray[i])
-            }
-        }
-        return list
     }
 }

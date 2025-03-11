@@ -309,7 +309,14 @@
                     const querySqlElement = document.getElementById('querySql');
                     const queryBindElement = document.getElementById('queryBind');
                     formData['query'] = querySqlElement.value;
-                    formData['bind'] = queryBindElement.value;
+                    if(queryBindElement.value.trim()) {
+                        try {
+                            formData['bind'] = JSON.parse(queryBindElement.value);
+                        } catch(e) {
+                            alert("JSON 파싱 오류: " + e)
+                            return
+                        }
+                    }
                 } else { // Existing logic for other forms (like /reply)
                     const replyTypeElement = form.querySelector('[name="type"]');
                     const replyDataElement = form.querySelector('[name="data"]');

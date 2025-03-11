@@ -4,6 +4,8 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -87,12 +89,7 @@ public class KakaoDB {
             String sql;
             String[] stringUserId = {Long.toString(userId)};
             if (checkNewDb()) {
-                sql = "WITH info AS (SELECT ? AS user_id) " +
-                        "SELECT COALESCE(open_chat_member.nickname, friends.name) AS name, " +
-                        "COALESCE(open_chat_member.enc, friends.enc) AS enc " +
-                        "FROM info " +
-                        "LEFT JOIN db2.open_chat_member ON open_chat_member.user_id = info.user_id " +
-                        "LEFT JOIN db2.friends ON friends.id = info.user_id;";
+                sql = "WITH info AS (SELECT ? AS user_id) " + "SELECT COALESCE(open_chat_member.nickname, friends.name) AS name, " + "COALESCE(open_chat_member.enc, friends.enc) AS enc " + "FROM info " + "LEFT JOIN db2.open_chat_member ON open_chat_member.user_id = info.user_id " + "LEFT JOIN db2.friends ON friends.id = info.user_id;";
             } else {
                 sql = "SELECT name, enc FROM db2.friends WHERE id = ?";
             }
@@ -220,19 +217,17 @@ public class KakaoDB {
         return this.db;
     }
 
-    public List<Map<String, Object>> executeQuery(String sqlQuery, String[] bindArgs) {
-        List<Map<String, Object>> resultList = new ArrayList<>();
+    public List<Map<String, @Nullable String>> executeQuery(String sqlQuery, String[] bindArgs) {
+        List<Map<String, String>> resultList = new ArrayList<>();
         try (Cursor cursor = getConnection().rawQuery(sqlQuery, bindArgs)) {
-            if (cursor != null) {
-                String[] columnNames = cursor.getColumnNames();
-                while (cursor.moveToNext()) {
-                    Map<String, Object> row = new HashMap<>();
-                    for (String columnName : columnNames) {
-                        int columnIndex = cursor.getColumnIndexOrThrow(columnName);
-                        row.put(columnName, cursor.getString(columnIndex));
-                    }
-                    resultList.add(row);
+            String[] columnNames = cursor.getColumnNames();
+            while (cursor.moveToNext()) {
+                Map<String, String> row = new HashMap<>();
+                for (String columnName : columnNames) {
+                    int columnIndex = cursor.getColumnIndexOrThrow(columnName);
+                    row.put(columnName, cursor.getString(columnIndex));
                 }
+                resultList.add(row);
             }
         }
         return resultList;

@@ -13,7 +13,7 @@ param(
 $IRIS_PROCESS_NAME = "qwer"
 $IRIS_PROCESS_KEYWORD = "app_process"
 $IRIS_START_COMMAND = "adb shell 'su root sh -c `"CLASSPATH=/data/local/tmp/Iris.apk app_process / party.qwer.iris.Main`"' 2>&1"
-$IRIS_APK_URL = "https://github.com/dolidolih/Iris/releases/download/v0.14/Iris.apk"
+$IRIS_APK_URL = "https://github.com/dolidolih/Iris/releases/latest/download/Iris.apk"
 $IRIS_APK_PATH = "/data/local/tmp/Iris.apk"
 $IRIS_APK_LOCAL_FILE = "Iris.apk"
 
