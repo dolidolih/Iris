@@ -2,6 +2,7 @@
 // Kakaodecrypt : jiru/kakaodecrypt
 package party.qwer.iris
 
+import kotlinx.coroutines.flow.MutableSharedFlow
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -12,13 +13,15 @@ class Main {
         @JvmStatic
         fun main(args: Array<String>) {
             try {
+                val wsEventFlow = MutableSharedFlow<String>()
+
                 val notificationReferer = readNotificationReferer()
 
                 Replier.startMessageSender()
                 println("Message sender thread started")
 
                 val kakaoDb = KakaoDB()
-                val observerHelper = ObserverHelper(kakaoDb)
+                val observerHelper = ObserverHelper(kakaoDb, wsEventFlow)
 
                 val dbObserver = DBObserver(kakaoDb, observerHelper)
                 dbObserver.startPolling()
@@ -28,8 +31,9 @@ class Main {
                 imageDeleter.startDeletion()
                 println("ImageDeleter started, and will delete images older than 1 hour.")
 
-                val irisServer =
-                    IrisServer(kakaoDb, dbObserver, observerHelper, notificationReferer)
+                val irisServer = IrisServer(
+                    kakaoDb, dbObserver, observerHelper, notificationReferer, wsEventFlow
+                )
                 irisServer.startServer()
                 println("Iris Server started")
 

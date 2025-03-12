@@ -1,6 +1,8 @@
 package party.qwer.iris
 
 import android.database.Cursor
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -11,7 +13,7 @@ import java.util.concurrent.Executors
 
 
 class ObserverHelper(
-    val db: KakaoDB
+    private val db: KakaoDB, private val wsBroadcastFlow: MutableSharedFlow<String>
 ) {
     private var lastLogId: Long = 0
     private val lastDecryptedLogs = LinkedList<Map<String, String?>>()
@@ -53,15 +55,15 @@ class ObserverHelper(
                         var attachment = cursor.getString(columnNames.indexOf("attachment"))
 
                         try {
-                            if (message.isNotEmpty() && message != "{}")
-                                message = KakaoDecrypt.decrypt(enc, message, userId)
+                            if (message.isNotEmpty() && message != "{}") message =
+                                KakaoDecrypt.decrypt(enc, message, userId)
                         } catch (e: Exception) {
                             println("failed to decrypt message: $e")
                         }
 
                         try {
-                            if (attachment.isNotEmpty() && attachment != "{}")
-                                attachment = KakaoDecrypt.decrypt(enc, attachment, userId)
+                            if (attachment.isNotEmpty() && attachment != "{}") attachment =
+                                KakaoDecrypt.decrypt(enc, attachment, userId)
                         } catch (e: Exception) {
                             println("failed to decrypt attachment: $e")
                         }
@@ -83,18 +85,21 @@ class ObserverHelper(
                         }
 
                         val chatInfo = db.getChatInfo(chatId, userId)
+                        val data = JSONObject(
+                            mapOf(
+                                "msg" to message,
+                                "room" to chatInfo[0],
+                                "sender" to chatInfo[1],
+                                "json" to raw
+                            )
+                        ).toString()
+
+                        runBlocking {
+                            wsBroadcastFlow.emit(data)
+                        }
 
                         httpRequestExecutor.execute {
-                            sendPostRequest(
-                                JSONObject(
-                                    mapOf(
-                                        "msg" to message,
-                                        "room" to chatInfo[0],
-                                        "sender" to chatInfo[1],
-                                        "json" to raw
-                                    )
-                                ).toString()
-                            )
+                            sendPostRequest(data)
                         }
                     }
                 }
