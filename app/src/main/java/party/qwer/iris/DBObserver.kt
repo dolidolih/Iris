@@ -1,6 +1,5 @@
 package party.qwer.iris
 
-import party.qwer.iris.Configurable.dbPollingRate
 import kotlin.concurrent.Volatile
 
 class DBObserver(private val kakaoDb: KakaoDB, private val observerHelper: ObserverHelper) {
@@ -16,7 +15,7 @@ class DBObserver(private val kakaoDb: KakaoDB, private val observerHelper: Obser
                 while (true) {
                     observerHelper.checkChange(kakaoDb)
                     try {
-                        val pollingInterval = dbPollingRate
+                        val pollingInterval = Configurable.dbPollingRate
                         if (pollingInterval > 0) {
                             Thread.sleep(pollingInterval)
                         } else {
