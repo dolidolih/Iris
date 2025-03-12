@@ -60,7 +60,7 @@ object Main {
         println("Message sender thread started")
 
         val kakaoDb = KakaoDB()
-        val observerHelper = ObserverHelper()
+        val observerHelper = ObserverHelper(kakaoDb)
 
         val dbObserver = DBObserver(kakaoDb, observerHelper)
         dbObserver.startPolling()

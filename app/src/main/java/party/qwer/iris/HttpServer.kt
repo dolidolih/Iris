@@ -150,7 +150,8 @@ class HttpServerKt(
                             roomId, replyRequest.data.jsonPrimitive.content
                         )
 
-                        ReplyType.IMAGE_MULTIPLE -> Replier.sendMultiplePhotos(roomId,
+                        ReplyType.IMAGE_MULTIPLE -> Replier.sendMultiplePhotos(
+                            roomId,
                             replyRequest.data.jsonArray.map { it.jsonPrimitive.content })
                     }
 
@@ -164,8 +165,8 @@ class HttpServerKt(
                         val rows = kakaoDB.executeQuery(queryRequest.query,
                             (queryRequest.bind?.map { it.content } ?: listOf()).toTypedArray())
 
-                        rows.forEach {
-                            decryptRow(it)
+                        rows.map {
+                            decryptRow(it.toMutableMap())
                         }
 
                         call.respond(QueryResponse(data = rows))
@@ -188,7 +189,9 @@ class HttpServerKt(
         }.start(wait = true)
     }
 
-    private fun decryptRow(row: MutableMap<String, String?>) {
+    private fun decryptRow(row: Map<String, String?>): MutableMap<String, String?> {
+        @Suppress("NAME_SHADOWING") val row = row.toMutableMap()
+
         try {
             if (row.contains("message") || row.contains("attachment")) {
                 val vStr = row.getOrDefault("v", "")
@@ -233,7 +236,7 @@ class HttpServerKt(
 
             if (row.contains("nickname")) {
                 try {
-                    val encryptedNickname = row.getOrDefault("nickname", "")
+                    val encryptedNickname = row.get("nickname")!!
                     row["nickname"] = KakaoDecrypt.decrypt(enc, encryptedNickname, botId)
                 } catch (e: Exception) {
                     System.err.println("Decryption error for nickname: $e")
@@ -258,5 +261,7 @@ class HttpServerKt(
         } catch (e: Exception) {
             System.err.println("JSON processing error during decryption: $e")
         }
+
+        return row
     }
 }
