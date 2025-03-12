@@ -98,8 +98,10 @@ class ObserverHelper(
                             wsBroadcastFlow.emit(data)
                         }
 
-                        httpRequestExecutor.execute {
-                            sendPostRequest(data)
+                        if (Configurable.webServerEndpoint.isNotEmpty()) {
+                            httpRequestExecutor.execute {
+                                sendPostRequest(data)
+                            }
                         }
                     }
                 }
