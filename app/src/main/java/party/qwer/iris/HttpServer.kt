@@ -165,11 +165,9 @@ class HttpServerKt(
                         val rows = kakaoDB.executeQuery(queryRequest.query,
                             (queryRequest.bind?.map { it.content } ?: listOf()).toTypedArray())
 
-                        rows.map {
-                            decryptRow(it.toMutableMap())
-                        }
-
-                        call.respond(QueryResponse(data = rows))
+                        call.respond(QueryResponse(data = rows.map {
+                            decryptRow(it)
+                        }))
                     } catch (e: Exception) {
                         throw Exception("Query 오류: query=${queryRequest.query}, err=${e.message}")
                     }
