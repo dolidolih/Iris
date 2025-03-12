@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+/output/Iris.apk
+/output/Iris-debug.apk
+/output/Iris-release.apk
