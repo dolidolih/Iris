@@ -7,8 +7,7 @@ class DBObserver(private val kakaoDb: KakaoDB, private val observerHelper: Obser
     private var pollingThread: Thread? = null
 
     @Volatile
-    var isObserving: Boolean = false
-        private set
+    private var isObserving: Boolean = false
 
     fun startPolling() {
         if (pollingThread == null || !pollingThread!!.isAlive) {
@@ -17,8 +16,7 @@ class DBObserver(private val kakaoDb: KakaoDB, private val observerHelper: Obser
                 while (true) {
                     observerHelper.checkChange(kakaoDb)
                     try {
-                        val pollingInterval =
-                            dbPollingRate
+                        val pollingInterval = dbPollingRate
                         if (pollingInterval > 0) {
                             Thread.sleep(pollingInterval)
                         } else {

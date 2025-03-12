@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.os.ServiceManager
 import android.util.Base64
+import party.qwer.iris.Replier.SendMessageRequest
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -20,7 +21,6 @@ import java.util.concurrent.LinkedBlockingQueue
 object Replier {
     private val binder: IBinder = ServiceManager.getService("activity")
     private val activityManager: IActivityManager = IActivityManager.Stub.asInterface(binder)
-    private val NOTI_REF = Main.NOTI_REF
     private val messageQueue: BlockingQueue<SendMessageRequest> = LinkedBlockingQueue()
 
     fun startMessageSender() {
@@ -81,7 +81,7 @@ object Replier {
     private fun sendPhotoInternal(room: Long, base64ImageDataString: String) {
         val decodedImage = Base64.decode(base64ImageDataString, Base64.DEFAULT)
         val timestamp = System.currentTimeMillis().toString()
-        val picDir = File(Main.IMAGE_DIR_PATH)
+        val picDir = File(IMAGE_DIR_PATH)
         if (!picDir.exists()) {
             picDir.mkdirs()
         }
@@ -167,7 +167,7 @@ object Replier {
         for (base64ImageDataString in base64ImageDataStrings) {
             val decodedImage = Base64.decode(base64ImageDataString, Base64.DEFAULT)
             val timestamp = System.currentTimeMillis().toString()
-            val picDir = File(Main.IMAGE_DIR_PATH)
+            val picDir = File(IMAGE_DIR_PATH)
             if (!picDir.exists()) {
                 picDir.mkdirs()
             }

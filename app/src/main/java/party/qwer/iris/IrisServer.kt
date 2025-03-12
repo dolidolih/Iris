@@ -31,7 +31,7 @@ import party.qwer.iris.model.ReplyRequest
 import party.qwer.iris.model.ReplyType
 
 
-class HttpServerKt(
+class IrisServer(
     val kakaoDB: KakaoDB,
     val dbObserver: DBObserver,
     val observerHelper: ObserverHelper,
@@ -75,8 +75,8 @@ class HttpServerKt(
                 get("/dashboard/status") {
                     call.respond(
                         DashboardStatusResponse(
-                            isObserving = dbObserver.isObserving,
-                            statusMessage = if (dbObserver.isObserving) {
+                            isObserving = dbObserver.isPollingThreadAlive,
+                            statusMessage = if (dbObserver.isPollingThreadAlive) {
                                 "Observing database"
                             } else {
                                 "Not observing database"
@@ -150,8 +150,7 @@ class HttpServerKt(
                             roomId, replyRequest.data.jsonPrimitive.content
                         )
 
-                        ReplyType.IMAGE_MULTIPLE -> Replier.sendMultiplePhotos(
-                            roomId,
+                        ReplyType.IMAGE_MULTIPLE -> Replier.sendMultiplePhotos(roomId,
                             replyRequest.data.jsonArray.map { it.jsonPrimitive.content })
                     }
 
