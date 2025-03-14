@@ -11,6 +11,8 @@ import android.os.ServiceManager
 import android.util.Base64
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 
 // SendMsg : ye-seola/go-kdb
@@ -19,24 +21,37 @@ class Replier {
     companion object {
         private val binder: IBinder = ServiceManager.getService("activity")
         private val activityManager: IActivityManager = IActivityManager.Stub.asInterface(binder)
-        private val messageChannel = Channel<SendMessageRequest>(Channel.BUFFERED)
+        private val messageChannel = Channel<SendMessageRequest>(Channel.CONFLATED)
         private val coroutineScope = CoroutineScope(Dispatchers.IO)
+        private var messageSenderJob: Job? = null
+        private val mutex = Mutex()
 
         init {
             startMessageSender()
         }
 
-        private fun startMessageSender() {
+        fun startMessageSender() {
             coroutineScope.launch {
-                for (request in messageChannel) {
-                    try {
-                        request.send()
-                        delay(Configurable.messageSendRate)
-                    } catch (e: Exception) {
-                        System.err.println("Error sending message from channel: $e")
+                if (messageSenderJob?.isActive == true) {
+                    messageSenderJob?.cancelAndJoin()
+                }
+                messageSenderJob = launch {
+                    for (request in messageChannel) {
+                        try {
+                            mutex.withLock {
+                                request.send()
+                                delay(Configurable.messageSendRate)
+                            }
+                        } catch (e: Exception) {
+                            System.err.println("Error sending message from channel: $e")
+                        }
                     }
                 }
             }
+        }
+
+        fun restartMessageSender() {
+            startMessageSender()
         }
 
         private fun sendMessageInternal(referer: String, chatId: Long, msg: String) {
