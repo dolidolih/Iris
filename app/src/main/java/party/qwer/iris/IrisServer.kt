@@ -108,9 +108,9 @@ class IrisServer(
 
                         when (name) {
                             "endpoint" -> {
-                                val value = req.endpoint
-                                if (value.isNullOrBlank()) {
-                                    throw Exception("missing or empty value")
+                                var value = req.endpoint
+                                if (value == null) {
+                                    value = ""
                                 }
                                 Configurable.webServerEndpoint = value
                             }
