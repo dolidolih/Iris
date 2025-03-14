@@ -2,6 +2,8 @@ package party.qwer.iris
 
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
+import org.json.JSONException
+import org.json.JSONObject
 
 class KakaoDB {
     lateinit var connection: SQLiteDatabase
@@ -139,7 +141,87 @@ class KakaoDB {
         return resultList
     }
 
+
     companion object {
         private const val DB_PATH = "/data/data/com.kakao.talk/databases"
+        fun decryptRow(row: Map<String, String?>): Map<String, String?> {
+            @Suppress("NAME_SHADOWING") val row = row.toMutableMap()
+
+            try {
+                if (row.contains("message") || row.contains("attachment")) {
+                    val vStr = row.getOrDefault("v", "")
+                    if (vStr?.isNotEmpty() == true) {
+                        try {
+                            val vJson = JSONObject(vStr)
+                            val enc = vJson.optInt("enc", 0)
+                            val userId = row.get("user_id")?.toLongOrNull() ?: Configurable.botId
+
+                            if (row.contains("message")) {
+                                val encryptedMessage = row.getOrDefault("message", "")
+                                if (encryptedMessage?.isNotEmpty() == true && encryptedMessage != "{}") {
+                                    try {
+                                        row["message"] =
+                                            KakaoDecrypt.decrypt(enc, encryptedMessage, userId)
+                                    } catch (e: Exception) {
+                                        System.err.println("Decryption error for message: $e")
+                                    }
+                                }
+                            }
+                            if (row.contains("attachment")) {
+                                val encryptedAttachment = row.getOrDefault("attachment", "")
+                                if (encryptedAttachment?.isNotEmpty() == true && encryptedAttachment != "{}") {
+                                    try {
+                                        row["attachment"] =
+                                            KakaoDecrypt.decrypt(enc, encryptedAttachment, userId)
+                                    } catch (e: Exception) {
+                                        System.err.println("Decryption error for attachment: $e")
+                                    }
+                                    row["attachment"] =
+                                        KakaoDecrypt.decrypt(enc, encryptedAttachment, userId)
+                                }
+                            }
+                        } catch (e: JSONException) {
+                            System.err.println("Error parsing 'v' for decryption: $e")
+                        }
+                    }
+                }
+
+                val botId = Configurable.botId
+                val enc = row["enc"]?.toIntOrNull() ?: 0
+
+                if (row.contains("nickname")) {
+                    try {
+                        val encryptedNickname = row.get("nickname")!!
+                        row["nickname"] = KakaoDecrypt.decrypt(enc, encryptedNickname, botId)
+                    } catch (e: Exception) {
+                        System.err.println("Decryption error for nickname: $e")
+                    }
+                }
+
+                val urlKeys =
+                    arrayOf(
+                        "profile_image_url",
+                        "full_profile_image_url",
+                        "original_profile_image_url"
+                    )
+
+                for (urlKey in urlKeys) {
+                    if (row.contains(urlKey)) {
+                        val encryptedUrl = row[urlKey]!!
+                        if (encryptedUrl.isNotEmpty()) {
+                            try {
+                                row[urlKey] = KakaoDecrypt.decrypt(enc, encryptedUrl, botId)
+                            } catch (e: Exception) {
+                                System.err.println("Decryption error for $urlKey: $e")
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                System.err.println("JSON processing error during decryption: $e")
+            }
+
+            return row
+        }
     }
 }
