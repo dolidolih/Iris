@@ -241,9 +241,14 @@ Iris는 기본적으로 HTTP 프로토콜을 통해 정보를 주고 받습니�
     curl -X POST -H "Content-Type: application/json" -d '{"port": 3001}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/botport
     ```
 
+#### WebSocket 엔드포인트
+
+*   **`/ws`**: WebSocket 연결을 생성합니다.
+
 ##### 메시지 전달을 위한 API 레퍼런스
 
-Iris가 카카오톡 데이터베이스에서 새 메시지를 감지하면 `/config/endpoint` API를 통해 구성된 `web_server_endpoint`로 `POST` 요청을 보냅니다. 요청 본문은 다음 구조의 JSON 객체입니다.
+Iris가 카카오톡 데이터베이스에서 새 메시지를 감지하면 `/config/endpoint` API를 통해 구성된 `web_server_endpoint`로 `POST` 요청을 보냅니다.
+또한, `/ws`를 통해 WebSocket이 연결되어 있다면, WebSocket으로도 아래의 이벤트를 전달합니다.
 
 ```json
 {
