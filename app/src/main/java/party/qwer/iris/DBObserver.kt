@@ -1,37 +1,32 @@
 package party.qwer.iris
 
-import kotlin.concurrent.Volatile
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 
 class DBObserver(private val kakaoDb: KakaoDB, private val observerHelper: ObserverHelper) {
-    private var pollingThread: Thread? = null
-
+    private var scheduler: ScheduledExecutorService? = null
+    private var scheduledFuture: ScheduledFuture<*>? = null
     @Volatile
     private var isObserving: Boolean = false
 
     fun startPolling() {
-        if (pollingThread == null || !pollingThread!!.isAlive) {
-            pollingThread = Thread {
-                isObserving = true
-                while (true) {
-                    observerHelper.checkChange(kakaoDb)
-                    try {
-                        val pollingInterval = Configurable.dbPollingRate
-                        if (pollingInterval > 0) {
-                            Thread.sleep(pollingInterval)
-                        } else {
-                            Thread.sleep(1000)
-                        }
-                    } catch (e: InterruptedException) {
-                        Thread.currentThread().interrupt()
-                        System.err.println("Polling thread interrupted: $e")
-                        isObserving = false
-                        break
-                    }
-                }
-                isObserving = false
+        if (scheduler == null || scheduler!!.isShutdown) {
+            scheduler = Executors.newSingleThreadScheduledExecutor { runnable ->
+                Thread(runnable, "DB-Polling-Thread")
             }
-            pollingThread!!.name = "DB-Polling-Thread"
-            pollingThread!!.start()
+        }
+
+        if (scheduledFuture == null || scheduledFuture!!.isCancelled || scheduledFuture!!.isDone) {
+            scheduledFuture = scheduler?.scheduleWithFixedDelay({
+                try {
+                    observerHelper.checkChange(kakaoDb)
+                } catch (e: Exception) {
+                    System.err.println("Error during DB polling: $e")
+                }
+            }, 0, Configurable.dbPollingRate.takeIf { it > 0 } ?: 1000, TimeUnit.MILLISECONDS)
+            isObserving = true
             println("DB Polling thread started.")
         } else {
             println("DB Polling thread is already running.")
@@ -39,14 +34,18 @@ class DBObserver(private val kakaoDb: KakaoDB, private val observerHelper: Obser
     }
 
     fun stopPolling() {
-        if (pollingThread != null && pollingThread!!.isAlive) {
-            pollingThread!!.interrupt()
-            pollingThread = null
+        if (scheduledFuture != null && !scheduledFuture!!.isCancelled && !scheduledFuture!!.isDone) {
+            scheduledFuture?.cancel(true)
+            scheduledFuture = null
             isObserving = false
             println("DB Polling thread stopped.")
+        }
+        if (scheduler != null && !scheduler!!.isShutdown) {
+            scheduler?.shutdown()
+            scheduler = null
         }
     }
 
     val isPollingThreadAlive: Boolean
-        get() = pollingThread != null && pollingThread!!.isAlive
+        get() = scheduledFuture != null && !scheduledFuture!!.isCancelled && !scheduledFuture!!.isDone
 }

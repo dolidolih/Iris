@@ -34,7 +34,7 @@ class Configurable {
                 configValues = json.decodeFromString(ConfigValues.serializer(), jsonString)
             } catch (e: IOException) {
                 println("Error reading config.json, creating default config: ${e.message}")
-                saveConfig() // save default config to file
+                saveConfig()
             } catch (e: SerializationException) {
                 System.err.println("JSON parsing error in config.json, creating default config: ${e.message}")
                 saveConfig()
@@ -102,6 +102,7 @@ class Configurable {
                 configValues.messageSendRate = value
                 saveConfig()
                 println("MessageSendRate updated to: $messageSendRate")
+                Replier.restartMessageSender()
             }
     }
 }
