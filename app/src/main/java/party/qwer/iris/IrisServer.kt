@@ -73,7 +73,7 @@ class IrisServer(
                         call.respondText(html, ContentType.Text.Html)
                     }
 
-                    get("/dashboard/status") {
+                    get("status") {
                         call.respond(
                             DashboardStatusResponse(
                                 isObserving = dbObserver.isPollingThreadAlive,
@@ -102,7 +102,7 @@ class IrisServer(
                         )
                     }
 
-                    post("/config/{name}") {
+                    post("{name}") {
                         val name = call.parameters["name"]
                         val req = call.receive<ConfigRequest>()
 

@@ -45,6 +45,7 @@ class ObserverHelper(
                         val origin = v.getString("origin")
 
                         if (origin == "SYNCMSG" || origin == "MCHATLOGS") {
+                            lastLogId = currentLogId
                             continue
                         }
 
@@ -53,6 +54,7 @@ class ObserverHelper(
 
                         var message = cursor.getString(columnNames.indexOf("message"))
                         var attachment = cursor.getString(columnNames.indexOf("attachment"))
+                        val messageType = cursor.getString(columnNames.indexOf("type"))
 
                         try {
                             if (message.isNotEmpty() && message != "{}") message =
@@ -62,8 +64,12 @@ class ObserverHelper(
                         }
 
                         try {
-                            if (attachment.isNotEmpty() && attachment != "{}") attachment =
-                                KakaoDecrypt.decrypt(enc, attachment, userId)
+                            if ((message.contains("선물") && messageType == "71") or (attachment == null)) {
+                                attachment = "{}"
+                            } else if (attachment.isNotEmpty() && attachment != "{}") {
+                                attachment =
+                                    KakaoDecrypt.decrypt(enc, attachment, userId)
+                            }
                         } catch (e: Exception) {
                             println("failed to decrypt attachment: $e")
                         }
