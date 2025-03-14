@@ -53,7 +53,10 @@ class Main {
             val regex = Regex("""<string name="NotificationReferer">(.*?)</string>""")
             val match = regex.find(data) ?: throw Exception("failed to extract referer from data")
 
-            return match.value
+            val referer =
+                match.groups[1]?.value ?: throw Exception("failed to extract referer from data")
+
+            return referer
         }
     }
 }
