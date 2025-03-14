@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import android.os.IBinder
-import android.os.ServiceManager
 
 @SuppressLint("PrivateApi")
 class AndroidHiddenApi {
@@ -20,7 +19,7 @@ class AndroidHiddenApi {
 
             val activityManager =
                 IActivityManagerStub.getMethod("asInterface", IBinder::class.java).invoke(
-                    null, ServiceManager.getService("activity")
+                    null, getService("activity")
                 )
 
 
@@ -92,7 +91,7 @@ class AndroidHiddenApi {
 
             val activityManager =
                 IActivityManagerStub.getMethod("asInterface", IBinder::class.java).invoke(
-                    null, ServiceManager.getService("activity")
+                    null, getService("activity")
                 )
 
 
@@ -199,7 +198,7 @@ class AndroidHiddenApi {
 
             val activityManager =
                 IActivityManagerStub.getMethod("asInterface", IBinder::class.java).invoke(
-                    null, ServiceManager.getService("activity")
+                    null, getService("activity")
                 )
 
 
@@ -263,6 +262,13 @@ class AndroidHiddenApi {
 
             println(errorMsg)
             throw Exception(errorMsg)
+        }
+
+        private fun getService(name: String): IBinder {
+            val method = Class.forName("android.os.ServiceManager")
+                .getMethod("getService", String::class.java)
+
+            return method.invoke(null, name) as IBinder
         }
     }
 }
