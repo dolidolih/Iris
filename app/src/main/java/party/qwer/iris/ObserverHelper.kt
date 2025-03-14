@@ -3,14 +3,14 @@ package party.qwer.iris
 import android.database.Cursor
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.runBlocking
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
-import java.nio.charset.StandardCharsets
 import java.util.LinkedList
 import java.util.concurrent.Executors
-
 
 class ObserverHelper(
     private val db: KakaoDB, private val wsBroadcastFlow: MutableSharedFlow<String>
@@ -18,6 +18,7 @@ class ObserverHelper(
     private var lastLogId: Long = 0
     private val lastDecryptedLogs = LinkedList<Map<String, String?>>()
     private val httpRequestExecutor = Executors.newFixedThreadPool(8)
+    private val okHttpClient = OkHttpClient()
 
     fun checkChange(db: KakaoDB) {
         if (lastLogId == 0L) {
@@ -147,39 +148,34 @@ class ObserverHelper(
         println("Sending HTTP POST request to: $url")
         println("JSON Data being sent: $jsonData")
 
-        val con = URL(url).openConnection() as HttpURLConnection
+        val mediaType = "application/json; charset=utf-8".toMediaType()
+        val requestBody = jsonData.toRequestBody(mediaType)
+
+        val request = Request.Builder()
+            .url(url)
+            .post(requestBody)
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .build()
 
         try {
-            // send
-            con.requestMethod = "POST"
-            con.setRequestProperty("Content-Type", "application/json")
-            con.setRequestProperty("Accept", "application/json")
-            con.connectTimeout = 5000
-            con.readTimeout = 5000
-            con.doOutput = true
+            okHttpClient.newCall(request).execute().use { response ->
+                val responseCode = response.code
+                println("HTTP Response Code: $responseCode")
 
-            con.outputStream.use { os ->
-                val input = jsonData.toByteArray(StandardCharsets.UTF_8)
-                os.write(input, 0, input.size)
-            }
-
-            // check
-            val responseCode = con.responseCode
-            println("HTTP Response Code: $responseCode")
-
-            try {
-                val responseBody = con.inputStream.bufferedReader().use {
-                    it.readText()
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string()
+                    println("HTTP Response Body: $responseBody")
+                } else {
+                    System.err.println("HTTP Error Response: $responseCode - ${response.message}")
+                    val errorBody = response.body?.string()
+                    if (errorBody != null) {
+                        System.err.println("Error Body: $errorBody")
+                    }
                 }
-
-                println("HTTP Response Body: $responseBody")
-            } catch (e: IOException) {
-                System.err.println("Error reading HTTP response body: " + e.message)
             }
         } catch (e: IOException) {
             System.err.println("Error sending POST request: " + e.message)
-        } finally {
-            con.disconnect()
         }
     }
 
