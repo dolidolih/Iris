@@ -10,7 +10,7 @@
 
 *   **안드로이드 기기:** 이 애플리케이션은 카카오톡이 설치되어 있는 안드로이드 기기에서 실행되도록 설계되었습니다.
 *   **루트 권한:** 카카오톡 데이터베이스와 일부 시스템 서비스에 접근하기 위하여 루트 권한이 필요합니다.
-*   **HTTP 서버:** Iris와 상호 작용하여 메시지를 처리하기 위한 별도의 HTTP 서버가 필요합니다.
+*   **HTTP 서버 또는 WebSocket 클라이언트:** Iris와 상호 작용하여 메시지를 처리하기 위한 별도의 HTTP 서버나 WebSocket 클라이언트가 필요합니다.
 
 ### 설치
 
@@ -241,9 +241,14 @@ Iris는 기본적으로 HTTP 프로토콜을 통해 정보를 주고 받습니�
     curl -X POST -H "Content-Type: application/json" -d '{"port": 3001}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/botport
     ```
 
+#### WebSocket 엔드포인트
+
+*   **`/ws`**: WebSocket 연결을 생성합니다.
+
 ##### 메시지 전달을 위한 API 레퍼런스
 
-Iris가 카카오톡 데이터베이스에서 새 메시지를 감지하면 `/config/endpoint` API를 통해 구성된 `web_server_endpoint`로 `POST` 요청을 보냅니다. 요청 본문은 다음 구조의 JSON 객체입니다.
+Iris가 카카오톡 데이터베이스에서 새 메시지를 감지하면 `/config/endpoint` API를 통해 구성된 `web_server_endpoint`로 `POST` 요청을 보냅니다.
+또한, `/ws`를 통해 WebSocket이 연결되어 있다면, WebSocket으로도 아래의 이벤트를 전달합니다.
 
 ```json
 {
