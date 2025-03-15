@@ -16,6 +16,7 @@ $IRIS_START_COMMAND = "adb shell 'su root sh -c `"CLASSPATH=/data/local/tmp/Iris
 $IRIS_APK_URL = "https://github.com/dolidolih/Iris/releases/latest/download/Iris.apk"
 $IRIS_APK_PATH = "/data/local/tmp/Iris.apk"
 $IRIS_APK_LOCAL_FILE = "Iris.apk"
+$IRIS_APK_MD5_LOCAL_FILE = "Iris.apk.md5"
 
 function Check-AdbInstalled {
     if (!(Get-Command adb -ErrorAction SilentlyContinue)) {
@@ -116,6 +117,35 @@ function Iris-Install {
         Write-Host "Failed to download Iris.apk. Please check the URL and your internet connection."
         return
     }
+
+    Write-Host "Downloading MD5 checksum..."
+    try {
+        Invoke-WebRequest -Uri ($IRIS_APK_URL + ".MD5") -OutFile $IRIS_APK_MD5_LOCAL_FILE
+        Write-Host "MD5 checksum downloaded."
+    } catch {
+        Write-Warning "Failed to download MD5 checksum. Skipping MD5 verification."
+        Write-Warning "Installation will proceed without checksum verification."
+
+    }
+
+    Write-Host "Verifying MD5 checksum..."
+    if (Test-Path $IRIS_APK_MD5_LOCAL_FILE) {
+        $expected_md5 = Get-Content $IRIS_APK_MD5_LOCAL_FILE
+        $calculated_md5 = Get-FileHash -Algorithm MD5 -Path $IRIS_APK_LOCAL_FILE | Select-Object -ExpandProperty Hash
+
+        if ($expected_md5 -eq $calculated_md5) {
+            Write-Host "MD5 checksum verification passed!"
+        } else {
+            Write-Host "MD5 checksum verification failed!"
+            Write-Host "Expected MD5: $($expected_md5)"
+            Write-Host "Calculated MD5: $($calculated_md5)"
+            Write-Host "Downloaded file may be corrupted. Installation aborted."
+            return
+        }
+    } else {
+        Write-Host "MD5 checksum verification skipped due to download failure."
+    }
+
 
     Write-Host "Pushing Iris.apk to device..."
     adb push $IRIS_APK_LOCAL_FILE $IRIS_APK_PATH
