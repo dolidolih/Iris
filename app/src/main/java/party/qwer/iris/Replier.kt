@@ -1,26 +1,27 @@
 package party.qwer.iris
 
-import android.app.IActivityManager
 import android.app.RemoteInput
 import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.IBinder
-import android.os.ServiceManager
 import android.util.Base64
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import party.qwer.iris.Replier.Companion.SendMessageRequest
 import java.io.File
 
 // SendMsg : ye-seola/go-kdb
 
 class Replier {
     companion object {
-        private val binder: IBinder = ServiceManager.getService("activity")
-        private val activityManager: IActivityManager = IActivityManager.Stub.asInterface(binder)
         private val messageChannel = Channel<SendMessageRequest>(Channel.CONFLATED)
         private val coroutineScope = CoroutineScope(Dispatchers.IO)
         private var messageSenderJob: Job? = null
@@ -68,16 +69,19 @@ class Replier {
                 }
 
                 val remoteInput = RemoteInput.Builder("reply_message").build()
-                val remoteInputs = arrayOf(remoteInput)
-                RemoteInput.addResultsToIntent(remoteInputs, this, results)
+                RemoteInput.addResultsToIntent(arrayOf(remoteInput), this, results)
             }
 
-            startService(intent)
+            AndroidHiddenApi.startService(intent)
         }
 
         fun sendMessage(referer: String, chatId: Long, msg: String) {
             coroutineScope.launch {
-                messageChannel.send(SendMessageRequest { sendMessageInternal(referer, chatId, msg) })
+                messageChannel.send(SendMessageRequest {
+                    sendMessageInternal(
+                        referer, chatId, msg
+                    )
+                })
             }
         }
 
@@ -141,7 +145,7 @@ class Replier {
             }
 
             try {
-                startActivity(intent)
+                AndroidHiddenApi.startActivity(intent)
             } catch (e: Exception) {
                 System.err.println("Error starting activity for sending multiple photos: $e")
                 throw e
@@ -157,36 +161,7 @@ class Replier {
             val mediaScanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE).apply {
                 data = uri
             }
-            broadcastIntent(mediaScanIntent)
-        }
-
-        private fun broadcastIntent(intent: Intent) {
-            activityManager.broadcastIntent(
-                null, intent, null, null, 0, null, null, null, -1, null, false, false, -2
-            )
-        }
-
-        private fun startActivity(intent: Intent) {
-            activityManager.startActivityAsUserWithFeature(
-                null,
-                "com.android.shell",
-                null,
-                intent,
-                intent.type,
-                null,
-                null,
-                0,
-                0,
-                null,
-                null,
-                -2
-            )
-        }
-
-        private fun startService(intent: Intent) {
-            activityManager.startService(
-                null, intent, intent.type, false, "com.android.shell", null, -2
-            )
+            AndroidHiddenApi.broadcastIntent(mediaScanIntent)
         }
     }
 }

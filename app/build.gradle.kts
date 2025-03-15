@@ -65,8 +65,6 @@ android.applicationVariants.all {
 
 
 dependencies {
-    compileOnly(files("libs/android-30.jar"))
-
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.ktor.server.netty)
