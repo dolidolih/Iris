@@ -6,6 +6,7 @@ IRIS_START_COMMAND="adb shell 'su root sh -c \"CLASSPATH=/data/local/tmp/Iris.ap
 IRIS_APK_URL="https://github.com/dolidolih/Iris/releases/latest/download/Iris.apk"
 IRIS_APK_PATH="/data/local/tmp/Iris.apk"
 IRIS_APK_LOCAL_FILE="Iris.apk"
+IRIS_MD5_URL="${IRIS_APK_URL}.MD5"
 
 check_adb_installed() {
   if ! command -v adb &> /dev/null
@@ -99,17 +100,53 @@ iris_install() {
   check_adb_installed || return 1
   check_adb_device || return 1
 
-  echo "Downloading Iris.apk..."
+  echo "Downloading Iris.apk and MD5 checksum..."
   if curl -Lo "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_URL"; then
-    echo "Download completed."
+    echo "Iris.apk download completed."
   elif wget -O "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_URL"; then
-    echo "Download completed."
+    echo "Iris.apk download completed."
   else
     echo "Failed to download Iris.apk. Please check the URL and your internet connection."
     return 1
   fi
 
-  echo "Pushing Iris.apk to device..."
+  if curl -Lo "$IRIS_APK_LOCAL_FILE.MD5" "$IRIS_MD5_URL"; then
+    echo "MD5 checksum download completed."
+  elif wget -O "$IRIS_APK_LOCAL_FILE.MD5" "$IRIS_MD5_URL"; then
+    echo "MD5 checksum download completed."
+  else
+    echo "Failed to download MD5 checksum. Skipping MD5 check."
+    echo "Pushing Iris.apk to device..."
+    adb push "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_PATH"
+    if [ $? -ne 0 ]; then
+      echo "Failed to push Iris.apk to /data/local/tmp. Check adb connection and permissions."
+      return 1
+    fi
+
+    echo "Verifying installation..."
+    adb shell "ls $IRIS_APK_PATH" > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+      echo "Installation completed (without MD5 check)!"
+    else
+      echo "Installation verification failed. File might not be in /data/local/tmp."
+    fi
+    return 0
+  fi
+
+  downloaded_md5=$(cat "$IRIS_APK_LOCAL_FILE.MD5" | awk '{print $1}')
+  calculated_md5=$(md5sum "$IRIS_APK_LOCAL_FILE" | awk '{print $1}')
+
+  downloaded_md5_lower=$(printf "%s" "$downloaded_md5" | tr '[:upper:]' '[:lower:]')
+  calculated_md5_lower=$(printf "%s" "$calculated_md5" | tr '[:upper:]' '[:lower:]')
+
+  if [ "$downloaded_md5_lower" != "$calculated_md5_lower" ]; then
+    echo "MD5 checksum mismatch! Downloaded file is corrupted."
+    rm "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_LOCAL_FILE.MD5"
+    return 1
+  fi
+  echo "MD5 checksum verification passed."
+
+  echo "Pushing verified Iris.apk to device..."
   adb push "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_PATH"
   if [ $? -ne 0 ]; then
     echo "Failed to push Iris.apk to /data/local/tmp. Check adb connection and permissions."
@@ -119,10 +156,77 @@ iris_install() {
   echo "Verifying installation..."
   adb shell "ls $IRIS_APK_PATH" > /dev/null 2>&1
   if [ $? -eq 0 ]; then
-    echo "Installation completed!"
+    echo "Installation completed successfully!"
   else
     echo "Installation verification failed. File might not be in /data/local/tmp."
   fi
+
+  rm "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_LOCAL_FILE.MD5"
+}
+
+iris_install_redroid() {
+  if ! command -v lsb_release &> /dev/null; then
+    echo "Warning: lsb-release is not installed. Version check may be inaccurate."
+    UBUNTU_VERSION="0"
+  else
+    UBUNTU_VERSION=$(lsb_release -rs | awk -F. '{print $1}')
+  fi
+
+  if [[ "$UBUNTU_VERSION" -lt 22 ]]; then
+    echo "This script only supports Ubuntu 22 or higher. Install manually."
+    return 1
+  fi
+
+  if command -v docker &> /dev/null
+  then
+      echo "Docker already installed. Skipping docker install."
+  else
+      echo "Installing Docker..."
+      sudo apt-get update
+      sudo apt-get install ca-certificates curl -y
+      sudo install -m 0755 -d /etc/apt/keyrings
+      sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+      $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
+      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+      sudo apt-get update
+      sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+      echo "Docker installed successfully."
+  fi
+
+  echo "Setting up binder drivers."
+
+  cat <<EOF > binder.service
+[Unit]
+Description=Auto load binder
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/modprobe binder_linux devices="binder,hwbinder,vndbinder"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  sudo cp binder.service /etc/systemd/system/binder.service
+  rm binder.service
+
+  sudo systemctl enable binder.service
+  sudo systemctl start binder.service
+
+  echo "Creating redoid docker container... It will take a few minutes."
+  sudo docker run -itd --privileged --name redroid \
+      -v ~/data:/data \
+      -p 5555:5555 \
+      -p 3000:3000 \
+      redroid/redroid:11.0.0-latest \
+      ro.product.model=SM-T970 \
+      ro.product.brand=Samsung
+
+  echo "Redroid installation finished."
 }
 
 
@@ -139,8 +243,11 @@ case "$1" in
   install)
     iris_install
     ;;
+  install_redroid)
+    iris_install_redroid
+    ;;
   *)
-    echo "Usage: $0 {status|start|stop|install}"
+    echo "Usage: $0 {status|start|stop|install|install_redroid}"
     exit 1
     ;;
 esac
