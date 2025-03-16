@@ -82,11 +82,17 @@ class KakaoDB {
             "SELECT private_meta FROM chat_rooms WHERE id = ?", arrayOf(chatId.toString())
         ).use { cursor ->
             if (cursor.moveToNext()) {
-                val meta = Json.decodeFromString<Map<String, JsonElement>>(cursor.getString(0))
-                val name = meta["name"]
+                val value = cursor.getString(0)
+                if (!value.isNullOrEmpty()) {
+                    try {
+                        val meta = Json.decodeFromString<Map<String, JsonElement>>(value)
+                        val name = meta["name"]
 
-                if (name != null) {
-                    return arrayOf(name.jsonPrimitive.content, sender)
+                        if (name != null) {
+                            return arrayOf(name.jsonPrimitive.content, sender)
+                        }
+                    } catch (_: Exception) {
+                    }
                 }
             }
         }
