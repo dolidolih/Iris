@@ -2,6 +2,9 @@ package party.qwer.iris
 
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.jsonPrimitive
 import org.json.JSONException
 import org.json.JSONObject
 
@@ -75,18 +78,35 @@ class KakaoDB {
             getNameOfUserId(userId)
         }
 
-        var room = sender
+        connection.rawQuery(
+            "SELECT private_meta FROM chat_rooms WHERE id = ?", arrayOf(chatId.toString())
+        ).use { cursor ->
+            if (cursor.moveToNext()) {
+                val value = cursor.getString(0)
+                if (!value.isNullOrEmpty()) {
+                    try {
+                        val meta = Json.decodeFromString<Map<String, JsonElement>>(value)
+                        val name = meta["name"]
+
+                        if (name != null) {
+                            return arrayOf(name.jsonPrimitive.content, sender)
+                        }
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        }
 
         connection.rawQuery(
             "SELECT name FROM db2.open_link WHERE id = (SELECT link_id FROM chat_rooms WHERE id = ?)",
             arrayOf(chatId.toString())
         ).use { cursor ->
             if (cursor.moveToNext()) {
-                room = cursor.getString(0)
+                return arrayOf(cursor.getString(0), sender)
             }
         }
 
-        return arrayOf(room, sender)
+        return arrayOf(sender, sender)
     }
 
     fun logToDict(logId: Long): Map<String, String?> {
@@ -198,12 +218,9 @@ class KakaoDB {
                     }
                 }
 
-                val urlKeys =
-                    arrayOf(
-                        "profile_image_url",
-                        "full_profile_image_url",
-                        "original_profile_image_url"
-                    )
+                val urlKeys = arrayOf(
+                    "profile_image_url", "full_profile_image_url", "original_profile_image_url"
+                )
 
                 for (urlKey in urlKeys) {
                     if (row.contains(urlKey)) {
