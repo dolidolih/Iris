@@ -130,7 +130,7 @@ class AndroidHiddenApi {
                         0,
                         null,
                         null,
-                        -2
+                        -3
                     )
                 }
             } catch (_: Exception) {
@@ -168,7 +168,7 @@ class AndroidHiddenApi {
                         0,
                         null,
                         null,
-                        -2
+                        -3
                     )
                 }
             } catch (_: Exception) {
@@ -240,7 +240,7 @@ class AndroidHiddenApi {
                         null,
                         false,
                         false,
-                        -2
+                        -3
                     )
                 }
             } catch (_: Exception) {
