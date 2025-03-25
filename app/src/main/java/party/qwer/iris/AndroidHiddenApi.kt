@@ -39,7 +39,7 @@ class AndroidHiddenApi {
 
                 return { intent ->
                     method.invoke(
-                        activityManager, null, intent, null, false, "com.android.shell", null, -2
+                        activityManager, null, intent, null, false, "com.android.shell", null, -3
                     )
                 }
             } catch (_: Exception) {
@@ -60,7 +60,7 @@ class AndroidHiddenApi {
 
                 return { intent ->
                     method.invoke(
-                        activityManager, null, intent, null, false, "com.android.shell", -2
+                        activityManager, null, intent, null, false, "com.android.shell", -3
                     )
                 }
             } catch (_: Exception) {
