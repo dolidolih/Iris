@@ -12,6 +12,10 @@ class AndroidHiddenApi {
         val startActivity = getStartActivityMethod()
         val broadcastIntent = getBroadcastIntentMethod()
 
+        private val callingPackageName: String by lazy {
+            System.getenv("IRIS_RUNNER") ?: "com.android.shell"
+        }
+
         private fun getStartServiceMethod(): (Intent) -> Unit {
             val IActivityManagerStub = Class.forName("android.app.IActivityManager\$Stub")
             val IActivityManager = Class.forName("android.app.IActivityManager")
@@ -39,7 +43,7 @@ class AndroidHiddenApi {
 
                 return { intent ->
                     method.invoke(
-                        activityManager, null, intent, null, false, "com.android.shell", null, -3
+                        activityManager, null, intent, null, false, callingPackageName, null, -3
                     )
                 }
             } catch (_: Exception) {
@@ -60,7 +64,7 @@ class AndroidHiddenApi {
 
                 return { intent ->
                     method.invoke(
-                        activityManager, null, intent, null, false, "com.android.shell", -3
+                        activityManager, null, intent, null, false, callingPackageName, -3
                     )
                 }
             } catch (_: Exception) {
@@ -120,7 +124,7 @@ class AndroidHiddenApi {
                     method.invoke(
                         activityManager,
                         null,
-                        "com.android.shell",
+                        callingPackageName,
                         null,
                         intent,
                         intent.type,
@@ -159,7 +163,7 @@ class AndroidHiddenApi {
                     method.invoke(
                         activityManager,
                         null,
-                        "com.android.shell",
+                        callingPackageName,
                         intent,
                         intent.type,
                         null,
