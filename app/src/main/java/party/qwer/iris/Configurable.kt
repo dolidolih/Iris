@@ -9,7 +9,9 @@ import party.qwer.iris.model.ConfigValues
 
 class Configurable {
     companion object {
-        private const val CONFIG_FILE_PATH = "/data/local/tmp/config.json"
+        private val CONFIG_FILE_PATH: String by lazy {
+            System.getenv("IRIS_CONFIG_PATH") ?: "/data/local/tmp/config.json"
+        }
         private var configValues: ConfigValues = ConfigValues()
 
         private val json = Json {
@@ -23,7 +25,7 @@ class Configurable {
         private fun loadConfig() {
             val configFile = File(CONFIG_FILE_PATH)
             if (!configFile.exists()) {
-                println("config.json not found, creating default config.")
+                println("config.json not found at $CONFIG_FILE_PATH, creating default config.")
                 saveConfig()
                 return
             }
@@ -33,10 +35,10 @@ class Configurable {
                 println("jsonString from file: $jsonString")
                 configValues = json.decodeFromString(ConfigValues.serializer(), jsonString)
             } catch (e: IOException) {
-                println("Error reading config.json, creating default config: ${e.message}")
+                println("Error reading config.json from $CONFIG_FILE_PATH, creating default config: ${e.message}")
                 saveConfig()
             } catch (e: SerializationException) {
-                System.err.println("JSON parsing error in config.json, creating default config: ${e.message}")
+                System.err.println("JSON parsing error in config.json from $CONFIG_FILE_PATH, creating default config: ${e.message}")
                 saveConfig()
             }
         }
@@ -50,9 +52,9 @@ class Configurable {
 
                 File(CONFIG_FILE_PATH).writeText(jsonString)
             } catch (e: IOException) {
-                System.err.println("Error writing config to file: ${e.message}")
+                System.err.println("Error writing config to file $CONFIG_FILE_PATH: ${e.message}")
             } catch (e: SerializationException) {
-                System.err.println("JSON error while saving config: ${e.message}")
+                System.err.println("JSON error while saving config to $CONFIG_FILE_PATH: ${e.message}")
             }
         }
 
