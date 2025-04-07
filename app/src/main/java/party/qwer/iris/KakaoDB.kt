@@ -161,11 +161,10 @@ class KakaoDB {
         return resultList
     }
 
-
     companion object {
         private const val DB_PATH = "/data/data/com.kakao.talk/databases"
         fun decryptRow(row: Map<String, String?>): Map<String, String?> {
-            @Suppress("NAME_SHADOWING") val row = row.toMutableMap()
+            @Suppress("NAME_SHADOWING") var row = row.toMutableMap()
 
             try {
                 if (row.contains("message") || row.contains("attachment")) {
@@ -175,69 +174,39 @@ class KakaoDB {
                             val vJson = JSONObject(vStr)
                             val enc = vJson.optInt("enc", 0)
                             val userId = row.get("user_id")?.toLongOrNull() ?: Configurable.botId
-
-                            if (row.contains("message")) {
-                                val encryptedMessage = row.getOrDefault("message", "")
-                                if (encryptedMessage?.isNotEmpty() == true && encryptedMessage != "{}") {
-                                    try {
-                                        row["message"] =
-                                            KakaoDecrypt.decrypt(enc, encryptedMessage, userId)
-                                    } catch (e: Exception) {
-                                        System.err.println("Decryption error for message: $e")
-                                    }
-                                }
-                            }
-                            if (row.contains("attachment")) {
-                                val encryptedAttachment = row.getOrDefault("attachment", "")
-                                if (encryptedAttachment?.isNotEmpty() == true && encryptedAttachment != "{}") {
-                                    try {
-                                        row["attachment"] =
-                                            KakaoDecrypt.decrypt(enc, encryptedAttachment, userId)
-                                    } catch (e: Exception) {
-                                        System.err.println("Decryption error for attachment: $e")
-                                    }
-                                    row["attachment"] =
-                                        KakaoDecrypt.decrypt(enc, encryptedAttachment, userId)
-                                }
-                            }
+                            val keysToDecrypt = arrayOf("message", "attachment")
+                            row = decryptRowValues(row, enc, userId, keysToDecrypt)
                         } catch (e: JSONException) {
                             System.err.println("Error parsing 'v' for decryption: $e")
                         }
                     }
                 }
 
-                val botId = Configurable.botId
-                val enc = row["enc"]?.toIntOrNull() ?: 0
-
-                if (row.contains("nickname")) {
-                    try {
-                        val encryptedNickname = row.get("nickname")!!
-                        row["nickname"] = KakaoDecrypt.decrypt(enc, encryptedNickname, botId)
-                    } catch (e: Exception) {
-                        System.err.println("Decryption error for nickname: $e")
-                    }
-                }
-
-                val urlKeys = arrayOf(
-                    "profile_image_url", "full_profile_image_url", "original_profile_image_url"
-                )
-
-                for (urlKey in urlKeys) {
-                    if (row.contains(urlKey)) {
-                        val encryptedUrl = row[urlKey]!!
-                        if (encryptedUrl.isNotEmpty()) {
-                            try {
-                                row[urlKey] = KakaoDecrypt.decrypt(enc, encryptedUrl, botId)
-                            } catch (e: Exception) {
-                                System.err.println("Decryption error for $urlKey: $e")
-                            }
-                        }
-                    }
+                if (row.contains("enc") && (row.contains("name") || row.contains("nick_name") || row.contains("nickname"))) {
+                    val botId = Configurable.botId
+                    val enc = row["enc"]?.toIntOrNull() ?: 0
+                    val keysToDecrypt = arrayOf("nick_name", "name", "nickname", "profile_image_url", "full_profile_image_url", "original_profile_image_url")
+                    row = decryptRowValues(row, enc, botId, keysToDecrypt)
                 }
             } catch (e: Exception) {
                 System.err.println("JSON processing error during decryption: $e")
             }
 
+            return row
+        }
+        private fun decryptRowValues(row: MutableMap<String, String?>, enc: Int, botId: Long, keysToDecrypt: Array<String>): MutableMap<String, String?> {
+            for (key in keysToDecrypt) {
+                if (row.containsKey(key)) {
+                    try {
+                        val encryptedValue = row.getOrDefault(key, "") as? String
+                        encryptedValue?.let {
+                            row[key] = KakaoDecrypt.decrypt(enc, it, botId)
+                        }
+                    } catch (e: Exception) {
+                        System.err.println("Decryption error for $key: $e")
+                    }
+                }
+            }
             return row
         }
     }
