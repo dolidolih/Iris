@@ -185,7 +185,7 @@ class KakaoDB {
                 if (row.contains("enc") && (row.contains("name") || row.contains("nick_name") || row.contains("nickname"))) {
                     val botId = Configurable.botId
                     val enc = row["enc"]?.toIntOrNull() ?: 0
-                    val keysToDecrypt = arrayOf("nick_name", "name", "nickname", "profile_image_url", "full_profile_image_url", "original_profile_image_url")
+                    val keysToDecrypt = arrayOf("nick_name", "name", "nickname", "profile_image_url", "full_profile_image_url", "original_profile_image_url", "status_message","contact_name","v","board_v")
                     row = decryptRowValues(row, enc, botId, keysToDecrypt)
                 }
             } catch (e: Exception) {
@@ -199,8 +199,10 @@ class KakaoDB {
                 if (row.containsKey(key)) {
                     try {
                         val encryptedValue = row.getOrDefault(key, "") as? String
-                        encryptedValue?.let {
-                            row[key] = KakaoDecrypt.decrypt(enc, it, botId)
+                        if (encryptedValue != "{}" && encryptedValue != "[]"){
+                            encryptedValue?.let {
+                                row[key] = KakaoDecrypt.decrypt(enc, it, botId)
+                            }
                         }
                     } catch (e: Exception) {
                         System.err.println("Decryption error for $key: $e")
