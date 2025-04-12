@@ -144,6 +144,29 @@ Iris는 기본적으로 HTTP 프로토콜을 통해 정보를 주고 받습니�
     }
     ```
 
+*   **`/aot` (GET)**: aot 관련 토큰을 리턴합니다.
+
+    **예시:**
+
+    ```bash
+    curl -X GET http://[YOUR_DEVICE_IP]:[bot_http_port]/aot
+    ```
+
+    **응답 (JSON):**
+
+    ```json
+    {
+      "success": true,
+      "aot" : {
+        "access_token" : String,
+        "refresh_token" : String,
+        "token_type" : String,
+        "d_id" : String
+      }
+    }
+    ```
+
+
 #### 설정 API 엔드포인트
 
 *   **`/dashboard` (GET)**: Iris 를 설정하기 위한 웹 UI를 제공합니다. 웹 브라우저에서 이 URL을 열어 설정을 수정하세요.
