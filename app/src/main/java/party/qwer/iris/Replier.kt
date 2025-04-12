@@ -142,7 +142,7 @@ class Replier {
                 putExtra("key_id", room)
                 putExtra("key_type", 1)
                 putExtra("key_from_direct_share", true)
-                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
 
             try {
