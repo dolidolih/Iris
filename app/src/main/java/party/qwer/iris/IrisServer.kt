@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import party.qwer.iris.model.AotResponse
 import party.qwer.iris.model.ApiResponse
 import party.qwer.iris.model.CommonErrorResponse
 import party.qwer.iris.model.ConfigRequest
@@ -152,6 +154,14 @@ class IrisServer(
 
                         call.respond(ApiResponse(success = true, message = "success"))
                     }
+                }
+
+                get("/aot") {
+                    val aotToken = AuthProvider.getToken()
+
+                    call.respond(
+                        AotResponse(success = true, aot = Json.parseToJsonElement(aotToken.toString()).jsonObject)
+                    )
                 }
 
                 post("/reply") {
