@@ -55,10 +55,11 @@ Iris는 기본적으로 HTTP 프로토콜을 통해 정보를 주고 받습니�
 
     ```json
     {
-      "type": "text",  // 또는 "image"
+      "type": "text",  // 또는 "image", "image_multiple"
       "room": "[CHAT_ROOM_ID]", // 채팅방 ID (문자열)
       "data": "[MESSAGE_TEXT]"  // 텍스트 메시지의 경우
                                 // 이미지 메시지의 경우 Base64 인코딩된 이미지 문자열
+                                // 여러 이미지 메시지의 경우 Base64 인코딩된 이미지 문자열의 리스트
     }
     ```
 
@@ -72,6 +73,7 @@ Iris는 기본적으로 HTTP 프로토콜을 통해 정보를 주고 받습니�
 
     ```bash
     curl -X POST -H "Content-Type: application/json" -d '{"type": "image", "room": "1234567890", "data": "[BASE64_ENCODED_IMAGE_DATA]"}' http://[YOUR_DEVICE_IP]:[bot_http_port]/reply
+    curl -X POST -H "Content-Type: application/json" -d '{"type": "image_multiple", "room": "1234567890", "data": [BASE64_ENCODED_IMAGE_DATA1,BASE64_ENCODED_IMAGE_DATA2,BASE64_ENCODED_IMAGE_DATA3]}' http://[YOUR_DEVICE_IP]:[bot_http_port]/reply
     ```
 
 *   **`/query`**: 카카오톡 데이터베이스에 SQL 쿼리를 실행합니다. 이 메소드는 응답에서 암호화된 데이터 필드를 자동으로 복호화합니다.
