@@ -117,11 +117,11 @@ class Replier {
                 }
             }
 
-            val uris = base64ImageDataStrings.map {
-                val decodedImage = Base64.decode(it, Base64.DEFAULT)
+            val uris = base64ImageDataStrings.mapIndexed { idx, base64ImageDataString ->
+                val decodedImage = Base64.decode(base64ImageDataString, Base64.DEFAULT)
                 val timestamp = System.currentTimeMillis().toString()
 
-                val imageFile = File(picDir, "$timestamp.png").apply {
+                val imageFile = File(picDir, "${timestamp}_${idx}.png").apply {
                     writeBytes(decodedImage)
                 }
 
