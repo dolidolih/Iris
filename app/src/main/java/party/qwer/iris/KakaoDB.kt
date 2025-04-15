@@ -182,7 +182,9 @@ class KakaoDB {
                     }
                 }
 
-                if (row.contains("enc") && (row.contains("name") || row.contains("nick_name") || row.contains("nickname"))) {
+                val keywords = listOf("name", "nick_name", "nickname", "profile_image_url", "full_profile_image_url", "original_profile_image_url", "status_message", "contact_name", "board_v")
+
+                if (row.contains("enc") && keywords.any { row.contains(it) }) {
                     val botId = Configurable.botId
                     val enc = row["enc"]?.toIntOrNull() ?: 0
                     val keysToDecrypt = arrayOf("nick_name", "name", "nickname", "profile_image_url", "full_profile_image_url", "original_profile_image_url", "status_message","contact_name","v","board_v")
