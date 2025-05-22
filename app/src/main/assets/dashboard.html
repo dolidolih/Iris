@@ -109,6 +109,7 @@
         .config-grid {
             display: grid;
             gap: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         }
 
         .config-item {
@@ -194,6 +195,10 @@
             margin-bottom: 0.5rem;
         }
 
+        .btn:last-of-type {
+            margin-right: 0;
+        }
+
         .btn-primary {
             background: var(--primary-color);
             color: white;
@@ -257,8 +262,12 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
         }
 
         .status-text {
@@ -332,26 +341,26 @@
             gap: 0.5rem;
         }
 
-        /* NEW STYLE FOR ALIGNMENT */
         .input-buttons-group {
             display: flex;
-            gap: 0.5rem; /* Space between input and buttons */
-            align-items: center; /* Vertically center the input and buttons */
+            flex-direction: column;
+            align-items: stretch;
+            gap: 1rem;
         }
 
         .input-buttons-group input {
-            flex: 1; /* Allows the input to take up available space */
+            width: 100%;
+            flex: none;
         }
 
         .input-buttons-group .btn {
-            flex-shrink: 0; /* Prevents buttons from shrinking */
-            margin-bottom: 0; /* Ensures no extra bottom margin interferes */
+            width: 100%;
+            text-align: center;
+            margin-right: 0;
+            margin-bottom: 0;
+            flex-shrink: 0;
         }
 
-
-        /* The following form-row styles are no longer directly used for input/button alignment
-           in the config section, but kept for completeness if used elsewhere.
-           If not used elsewhere, they can be safely removed. */
         .form-row {
             display: flex;
             gap: 1rem;
@@ -385,8 +394,10 @@
                 padding: 1.5rem;
             }
 
-            /* This media query for form-row won't apply to the config sections anymore
-               due to HTML structure change. */
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+
             .form-row {
                 flex-direction: column;
                 gap: 0;
@@ -408,10 +419,11 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
-        /* Scrollbar styling for dark mode */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -428,6 +440,17 @@
 
         ::-webkit-scrollbar-thumb:hover {
             background: var(--border-color);
+        }
+
+        #lastLogs {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 0.5rem;
+        }
+
+        .log-table td {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
     </style>
 </head>
@@ -451,11 +474,12 @@
                         <label for="botName">Current Bot Name</label>
                         <input type="text" id="botName" value="CURRENT_BOT_NAME" readonly>
                     </div>
-                    <div class="form-group"> <!-- Modified: This form-group now contains the label and the input-buttons-group -->
+                    <div class="form-group">
                         <label for="newBotName">New Bot Name</label>
-                        <div class="input-buttons-group"> <!-- New wrapper -->
+                        <div class="input-buttons-group">
                             <input type="text" id="newBotName" placeholder="Enter new bot name">
-                            <button class="btn btn-primary" onclick="updateConfig('botname', document.getElementById('newBotName').value)">
+                            <button class="btn btn-primary"
+                                    onclick="updateConfig('botname', document.getElementById('newBotName').value)">
                                 <i class="fas fa-save"></i> Update
                             </button>
                         </div>
@@ -468,11 +492,12 @@
                         <label for="webServerEndpoint">Current Endpoint</label>
                         <input type="text" id="webServerEndpoint" value="CURRENT_WEB_ENDPOINT" readonly>
                     </div>
-                    <div class="form-group"> <!-- Modified -->
+                    <div class="form-group">
                         <label for="newWebServerEndpoint">New Endpoint</label>
-                        <div class="input-buttons-group"> <!-- New wrapper -->
+                        <div class="input-buttons-group">
                             <input type="text" id="newWebServerEndpoint" placeholder="http://172.17.0.1:5000/db">
-                            <button class="btn btn-primary" onclick="updateConfig('endpoint', document.getElementById('newWebServerEndpoint').value)">
+                            <button class="btn btn-primary"
+                                    onclick="updateConfig('endpoint', document.getElementById('newWebServerEndpoint').value)">
                                 <i class="fas fa-save"></i> Update
                             </button>
                             <button class="btn btn-danger" onclick="clearEndpoint()">
@@ -488,11 +513,12 @@
                         <label for="dbPollingRate">Current Rate (ms)</label>
                         <input type="number" id="dbPollingRate" value="CURRENT_DB_RATE" readonly>
                     </div>
-                    <div class="form-group"> <!-- Modified -->
+                    <div class="form-group">
                         <label for="newDbPollingRate">New Rate (ms)</label>
-                        <div class="input-buttons-group"> <!-- New wrapper -->
+                        <div class="input-buttons-group">
                             <input type="number" id="newDbPollingRate" placeholder="5000">
-                            <button class="btn btn-primary" onclick="updateConfig('dbrate', document.getElementById('newDbPollingRate').value)">
+                            <button class="btn btn-primary"
+                                    onclick="updateConfig('dbrate', document.getElementById('newDbPollingRate').value)">
                                 <i class="fas fa-save"></i> Update
                             </button>
                         </div>
@@ -505,11 +531,12 @@
                         <label for="messageSendRate">Current Rate (ms)</label>
                         <input type="number" id="messageSendRate" value="CURRENT_SEND_RATE" readonly>
                     </div>
-                    <div class="form-group"> <!-- Modified -->
+                    <div class="form-group">
                         <label for="newMessageSendRate">New Rate (ms)</label>
-                        <div class="input-buttons-group"> <!-- New wrapper -->
+                        <div class="input-buttons-group">
                             <input type="number" id="newMessageSendRate" placeholder="1000">
-                            <button class="btn btn-primary" onclick="updateConfig('sendrate', document.getElementById('newMessageSendRate').value)">
+                            <button class="btn btn-primary"
+                                    onclick="updateConfig('sendrate', document.getElementById('newMessageSendRate').value)">
                                 <i class="fas fa-save"></i> Update
                             </button>
                         </div>
@@ -522,11 +549,12 @@
                         <label for="botPort">Current Port</label>
                         <input type="number" id="botPort" value="CURRENT_BOT_PORT" readonly>
                     </div>
-                    <div class="form-group"> <!-- Modified -->
+                    <div class="form-group">
                         <label for="newBotPort">New Port</label>
-                        <div class="input-buttons-group"> <!-- New wrapper -->
+                        <div class="input-buttons-group">
                             <input type="number" id="newBotPort" placeholder="3000">
-                            <button class="btn btn-primary" onclick="updateConfig('botport', document.getElementById('newBotPort').value)">
+                            <button class="btn btn-primary"
+                                    onclick="updateConfig('botport', document.getElementById('newBotPort').value)">
                                 <i class="fas fa-save"></i> Update
                             </button>
                         </div>
@@ -563,15 +591,18 @@
 
                     <div class="form-group">
                         <label for="replyData">Message Data</label>
-                        <textarea id="replyData" name="data" rows="4" required placeholder="Enter message text"></textarea>
+                        <textarea id="replyData" name="data" rows="4" required
+                                  placeholder="Enter message text"></textarea>
                     </div>
 
                     <div class="form-group">
                         <label for="replyRawJson">Raw JSON Body (override above)</label>
-                        <textarea id="replyRawJson" name="rawJson" rows="4" placeholder='{"room": "", "type": "text", "data": ""}'></textarea>
+                        <textarea id="replyRawJson" name="rawJson" rows="4"
+                                  placeholder='{"room": "", "type": "text", "data": ""}'></textarea>
                     </div>
 
-                    <button type="button" class="btn btn-primary" onclick="submitForm('/reply', 'replyForm', 'replyResponseArea')">
+                    <button type="button" class="btn btn-primary"
+                            onclick="submitForm('/reply', 'replyForm', 'replyResponseArea')">
                         <i class="fas fa-paper-plane"></i> Send Reply
                     </button>
                 </form>
@@ -597,10 +628,12 @@
 
                     <div class="form-group">
                         <label for="queryRawJson">Raw JSON Body (override above)</label>
-                        <textarea id="queryRawJson" name="rawJson" rows="4" placeholder='{"query": "SELECT * FROM chat_logs LIMIT 10"}'></textarea>
+                        <textarea id="queryRawJson" name="rawJson" rows="4"
+                                  placeholder='{"query": "SELECT * FROM chat_logs LIMIT 10"}'></textarea>
                     </div>
 
-                    <button type="button" class="btn btn-primary" onclick="submitForm('/query', 'queryForm', 'queryResponseArea')">
+                    <button type="button" class="btn btn-primary"
+                            onclick="submitForm('/query', 'queryForm', 'queryResponseArea')">
                         <i class="fas fa-play"></i> Execute Query
                     </button>
                 </form>
@@ -676,7 +709,7 @@
                         ['_id', 'chat_id', 'user_id', 'message', 'created_at'].forEach(key => {
                             const cell = row.insertCell();
 
-                            if(key == "created_at") {
+                            if (key == "created_at") {
                                 cell.textContent = formatUnixTimestamp(log[key] || 0)
                             } else {
                                 cell.textContent = log[key] || '';
@@ -726,10 +759,10 @@
                     const querySqlElement = document.getElementById('querySql');
                     const queryBindElement = document.getElementById('queryBind');
                     formData['query'] = querySqlElement.value;
-                    if(queryBindElement.value.trim()) {
+                    if (queryBindElement.value.trim()) {
                         try {
                             formData['bind'] = JSON.parse(queryBindElement.value);
-                        } catch(e) {
+                        } catch (e) {
                             alert("JSON parsing error: " + e);
                             return;
                         }
@@ -804,7 +837,7 @@
         if (replyType.value === 'image') {
             replyDataTextarea.placeholder = 'Enter base64 encoded image data';
         } else if (replyType.value === 'image_multiple') {
-            replyDataTextarea.placeholder = 'Enter base64 encoded image data JSON Array';
+            replyDataTextarea.placeholder = 'Enter base64 encoded image data JSON Array (e.g., ["data1", "data2"])';
         } else {
             replyDataTextarea.placeholder = 'Enter message text';
         }
