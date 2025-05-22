@@ -3,38 +3,150 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iris Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #8b5cf6;
+            --secondary-color: #1e293b;
+            --accent-color: #06b6d4;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --bg-card: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --border-focus: #6366f1;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --radius-xl: 1rem;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f4f4f4;
+            font-family: system-ui, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
         }
 
-        h1 {
-            color: #333;
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
         }
 
-        .config-section {
-            background-color: #fff;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
         }
 
-        .section {
-            background-color: #fff;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-lg);
+            margin-bottom: 2rem;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: 1px solid var(--border-color);
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5);
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            color: white;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-body {
+            padding: 2rem;
+        }
+
+        .config-grid {
+            display: grid;
+            gap: 2rem;
+        }
+
+        .config-item {
+            background: var(--bg-tertiary);
+            padding: 1.5rem;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+            transition: border-color 0.2s ease;
+        }
+
+        .config-item:hover {
+            border-color: var(--primary-color);
+        }
+
+        .config-item h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
         }
 
         label {
             display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
         }
 
         input[type='text'],
@@ -42,210 +154,484 @@
         textarea,
         select {
             width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            background: var(--bg-primary);
+            color: var(--text-primary);
         }
 
-        button {
-            background-color: #5cb85c;
-            color: white;
-            padding: 10px 15px;
+        input[type='text']:focus,
+        input[type='number']:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        input[readonly] {
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
             border: none;
-            border-radius: 4px;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            font-weight: 500;
             cursor: pointer;
-            margin-right: 5px; /* Added some right margin for spacing */
+            transition: all 0.2s ease;
+            text-decoration: none;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
         }
 
-        button:hover {
-            background-color: #4cae4c;
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-secondary);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: var(--error-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
         }
 
         .status-section {
-            margin-top: 20px;
-            padding: 10px;
-            border-radius: 5px;
-            background-color: #e0e0e0;
+            background: var(--bg-card);
+            border-radius: var(--radius-xl);
+            padding: 2rem;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+        }
+
+        .status-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
         }
 
         .status-good {
-            color: green;
+            background: var(--success-color);
         }
 
         .status-bad {
-            color: red;
+            background: var(--error-color);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-text {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .status-text.good {
+            color: var(--success-color);
+        }
+
+        .status-text.bad {
+            color: var(--error-color);
         }
 
         .log-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
-        }
-
-        .log-table th,
-        .log-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
+            margin-top: 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
         }
 
         .log-table th {
-            background-color: #f0f0f0;
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--border-color);
         }
 
-        #responseArea {
+        .log-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .log-table tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .log-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .response-area {
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            padding: 1.5rem;
+            border-radius: var(--radius-lg);
+            margin-top: 1rem;
+            font-family: monospace;
+            font-size: 0.875rem;
             white-space: pre-wrap;
-            background-color: #eee;
-            padding: 10px;
-            border-radius: 4px;
-            margin-top: 10px;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
         }
 
-        .config-notice {
-            color: orange;
-            font-weight: bold;
-            margin-top: 10px;
+        .notice {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid var(--warning-color);
+            color: var(--warning-color);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* NEW STYLE FOR ALIGNMENT */
+        .input-buttons-group {
+            display: flex;
+            gap: 0.5rem; /* Space between input and buttons */
+            align-items: center; /* Vertically center the input and buttons */
+        }
+
+        .input-buttons-group input {
+            flex: 1; /* Allows the input to take up available space */
+        }
+
+        .input-buttons-group .btn {
+            flex-shrink: 0; /* Prevents buttons from shrinking */
+            margin-bottom: 0; /* Ensures no extra bottom margin interferes */
+        }
+
+
+        /* The following form-row styles are no longer directly used for input/button alignment
+           in the config section, but kept for completeness if used elsewhere.
+           If not used elsewhere, they can be safely removed. */
+        .form-row {
+            display: flex;
+            gap: 1rem;
+            align-items: end;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .form-row .btn {
+            margin-bottom: 0;
+        }
+
+        .section-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .card-body {
+                padding: 1.5rem;
+            }
+
+            /* This media query for form-row won't apply to the config sections anymore
+               due to HTML structure change. */
+            .form-row {
+                flex-direction: column;
+                gap: 0;
+            }
+
+            .section-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .loading {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: currentColor;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Scrollbar styling for dark mode */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-color);
         }
     </style>
 </head>
 
 <body>
-<h1>Iris Dashboard</h1>
-
-<div class="config-section">
-    <h2>Configurations</h2>
-
-    <div>
-        <h3>Bot Name</h3>
-        <label for="botName">Current Bot Name:</label>
-        <input type="text" id="botName" value="CURRENT_BOT_NAME" readonly>
-        <label for="newBotName">New Bot Name:</label>
-        <input type="text" id="newBotName" placeholder="Enter new bot name">
-        <button onclick="updateConfig('botname', document.getElementById('newBotName').value)">
-            Update Bot Name
-        </button>
+<div class="container">
+    <div class="header">
+        <h1><i class="fas fa-robot"></i> Iris Dashboard</h1>
+        <p>Modern bot management and monitoring interface</p>
     </div>
-    <div>
-        <h3>Web Server Endpoint</h3>
-        <label for="webServerEndpoint">Current Endpoint:</label>
-        <input type="text" id="webServerEndpoint" value="CURRENT_WEB_ENDPOINT" readonly>
-        <label for="newWebServerEndpoint">New Endpoint:</label>
-        <input type="text" id="newWebServerEndpoint" placeholder="Enter new endpoint. ex: http://172.17.0.1:5000/db">
-        <div>
-            <button onclick="updateConfig('endpoint', document.getElementById('newWebServerEndpoint').value)">
-                Update Endpoint
-            </button>
-            <button onclick="clearEndpoint()">
-                Clear Endpoint
-            </button>
+
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-cog"></i> Configuration Settings</h2>
+        </div>
+        <div class="card-body">
+            <div class="config-grid">
+                <div class="config-item">
+                    <h3><i class="fas fa-tag"></i> Bot Name</h3>
+                    <div class="form-group">
+                        <label for="botName">Current Bot Name</label>
+                        <input type="text" id="botName" value="CURRENT_BOT_NAME" readonly>
+                    </div>
+                    <div class="form-group"> <!-- Modified: This form-group now contains the label and the input-buttons-group -->
+                        <label for="newBotName">New Bot Name</label>
+                        <div class="input-buttons-group"> <!-- New wrapper -->
+                            <input type="text" id="newBotName" placeholder="Enter new bot name">
+                            <button class="btn btn-primary" onclick="updateConfig('botname', document.getElementById('newBotName').value)">
+                                <i class="fas fa-save"></i> Update
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-item">
+                    <h3><i class="fas fa-server"></i> Web Server Endpoint</h3>
+                    <div class="form-group">
+                        <label for="webServerEndpoint">Current Endpoint</label>
+                        <input type="text" id="webServerEndpoint" value="CURRENT_WEB_ENDPOINT" readonly>
+                    </div>
+                    <div class="form-group"> <!-- Modified -->
+                        <label for="newWebServerEndpoint">New Endpoint</label>
+                        <div class="input-buttons-group"> <!-- New wrapper -->
+                            <input type="text" id="newWebServerEndpoint" placeholder="http://172.17.0.1:5000/db">
+                            <button class="btn btn-primary" onclick="updateConfig('endpoint', document.getElementById('newWebServerEndpoint').value)">
+                                <i class="fas fa-save"></i> Update
+                            </button>
+                            <button class="btn btn-danger" onclick="clearEndpoint()">
+                                <i class="fas fa-trash"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-item">
+                    <h3><i class="fas fa-database"></i> DB Polling Rate</h3>
+                    <div class="form-group">
+                        <label for="dbPollingRate">Current Rate (ms)</label>
+                        <input type="number" id="dbPollingRate" value="CURRENT_DB_RATE" readonly>
+                    </div>
+                    <div class="form-group"> <!-- Modified -->
+                        <label for="newDbPollingRate">New Rate (ms)</label>
+                        <div class="input-buttons-group"> <!-- New wrapper -->
+                            <input type="number" id="newDbPollingRate" placeholder="5000">
+                            <button class="btn btn-primary" onclick="updateConfig('dbrate', document.getElementById('newDbPollingRate').value)">
+                                <i class="fas fa-save"></i> Update
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-item">
+                    <h3><i class="fas fa-paper-plane"></i> Message Send Rate</h3>
+                    <div class="form-group">
+                        <label for="messageSendRate">Current Rate (ms)</label>
+                        <input type="number" id="messageSendRate" value="CURRENT_SEND_RATE" readonly>
+                    </div>
+                    <div class="form-group"> <!-- Modified -->
+                        <label for="newMessageSendRate">New Rate (ms)</label>
+                        <div class="input-buttons-group"> <!-- New wrapper -->
+                            <input type="number" id="newMessageSendRate" placeholder="1000">
+                            <button class="btn btn-primary" onclick="updateConfig('sendrate', document.getElementById('newMessageSendRate').value)">
+                                <i class="fas fa-save"></i> Update
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-item">
+                    <h3><i class="fas fa-network-wired"></i> Bot Port</h3>
+                    <div class="form-group">
+                        <label for="botPort">Current Port</label>
+                        <input type="number" id="botPort" value="CURRENT_BOT_PORT" readonly>
+                    </div>
+                    <div class="form-group"> <!-- Modified -->
+                        <label for="newBotPort">New Port</label>
+                        <div class="input-buttons-group"> <!-- New wrapper -->
+                            <input type="number" id="newBotPort" placeholder="3000">
+                            <button class="btn btn-primary" onclick="updateConfig('botport', document.getElementById('newBotPort').value)">
+                                <i class="fas fa-save"></i> Update
+                            </button>
+                        </div>
+                    </div>
+                    <div class="notice">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Server restart required for bot port changes to take effect.
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div>
-        <h3>DB Polling Rate</h3>
-        <label for="dbPollingRate">Current Rate (ms):</label>
-        <input type="number" id="dbPollingRate" value="CURRENT_DB_RATE" readonly>
-        <label for="newDbPollingRate">New Rate (ms):</label>
-        <input type="number" id="newDbPollingRate" placeholder="Enter new DB polling rate">
-        <button onclick="updateConfig('dbrate', document.getElementById('newDbPollingRate').value)">
-            Update DB Rate
-        </button>
+    <div class="section-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="fas fa-reply"></i> Reply Endpoint Test</h2>
+            </div>
+            <div class="card-body">
+                <form id="replyForm">
+                    <div class="form-group">
+                        <label for="replyRoom">Room ID</label>
+                        <input type="text" id="replyRoom" name="room" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="replyType">Message Type</label>
+                        <select id="replyType" name="type" onchange="updateReplyDataPlaceholder()">
+                            <option value="text">Text</option>
+                            <option value="image">Image (Base64)</option>
+                            <option value="image_multiple">Multiple Images (Base64 JSON Array)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="replyData">Message Data</label>
+                        <textarea id="replyData" name="data" rows="4" required placeholder="Enter message text"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="replyRawJson">Raw JSON Body (override above)</label>
+                        <textarea id="replyRawJson" name="rawJson" rows="4" placeholder='{"room": "", "type": "text", "data": ""}'></textarea>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" onclick="submitForm('/reply', 'replyForm', 'replyResponseArea')">
+                        <i class="fas fa-paper-plane"></i> Send Reply
+                    </button>
+                </form>
+                <div id="replyResponseArea" class="response-area" style="display: none;"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="fas fa-search"></i> Query Endpoint Test</h2>
+            </div>
+            <div class="card-body">
+                <form id="queryForm">
+                    <div class="form-group">
+                        <label for="querySql">SQL Query</label>
+                        <textarea id="querySql" name="query" rows="4" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="queryBind">Bind Parameters (JSON Array String, optional)</label>
+                        <input type="text" id="queryBind" name="bind" placeholder='["value1", "value2"]'>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="queryRawJson">Raw JSON Body (override above)</label>
+                        <textarea id="queryRawJson" name="rawJson" rows="4" placeholder='{"query": "SELECT * FROM chat_logs LIMIT 10"}'></textarea>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" onclick="submitForm('/query', 'queryForm', 'queryResponseArea')">
+                        <i class="fas fa-play"></i> Execute Query
+                    </button>
+                </form>
+                <div id="queryResponseArea" class="response-area" style="display: none;"></div>
+            </div>
+        </div>
     </div>
 
-    <div>
-        <h3>Message Send Rate</h3>
-        <label for="messageSendRate">Current Rate (ms):</label>
-        <input type="number" id="messageSendRate" value="CURRENT_SEND_RATE" readonly>
-        <label for="newMessageSendRate">New Rate (ms):</label>
-        <input type="number" id="newMessageSendRate" placeholder="Enter new message send rate">
-        <button onclick="updateConfig('sendrate', document.getElementById('newMessageSendRate').value)">
-            Update Send Rate
-        </button>
+    <div class="status-section">
+        <div class="status-header">
+            <h2><i class="fas fa-heartbeat"></i> Database Observation Status</h2>
+        </div>
+        <div class="status-header">
+            <div class="status-indicator" id="statusIndicator"></div>
+            <p class="status-text" id="dbStatus">Checking status...</p>
+        </div>
+        <h3><i class="fas fa-history"></i> Recent Chat Logs</h3>
+        <div id="lastLogs"></div>
     </div>
-
-    <div>
-        <h3>Bot Port</h3>
-        <label for="botPort">Current Port:</label>
-        <input type="number" id="botPort" value="CURRENT_BOT_PORT" readonly>
-        <label for="newBotPort">New Port:</label>
-        <input type="number" id="newBotPort" placeholder="Enter new bot port">
-        <button onclick="updateConfig('botport', document.getElementById('newBotPort').value)">
-            Update Bot Port
-        </button>
-        <p class="config-notice">Notice: Server restart required for bot port changes to take
-            effect.</p>
-    </div>
-</div>
-
-
-<div class="section">
-    <h2>/reply Endpoint Test</h2>
-    <form id="replyForm">
-        <label for="replyRoom">Room ID:</label>
-        <input type="text" id="replyRoom" name="room" required>
-
-        <label for="replyType">Message Type:</label>
-        <select id="replyType" name="type" onchange="updateReplyDataPlaceholder()">
-            <option value="text">Text</option>
-            <option value="image">Image (Base64)</option>
-            <option value="image_multiple">Multiple Images (Base64 JSON Array)</option>
-        </select>
-
-        <label for="replyData">Message Data:</label>
-        <textarea id="replyData" name="data" rows="4" required
-                  placeholder="Enter message text"></textarea>
-
-        <label for="replyRawJson">Raw JSON Body (override above):</label>
-        <textarea id="replyRawJson" name="rawJson" rows="4"
-                  placeholder='{"room": "", "type": "text", "data": ""}'></textarea>
-
-        <button type="button" onclick="submitForm('/reply', 'replyForm', 'replyResponseArea')">Send
-            Reply
-        </button>
-    </form>
-    <div id="replyResponseArea"></div>
-</div>
-
-<div class="section">
-    <h2>/query Endpoint Test</h2>
-    <form id="queryForm">
-        <label for="querySql">SQL Query:</label>
-        <textarea id="querySql" name="query" rows="4" required></textarea>
-
-        <label for="queryBind">Bind Parameters (JSON Array String, optional):</label>
-        <input type="text" id="queryBind" name="bind" placeholder='["value1", "value2"]'>
-
-        <label for="queryRawJson">Raw JSON Body (override above):</label>
-        <textarea id="queryRawJson" name="rawJson" rows="4"
-                  placeholder='{"query": "SELECT * FROM chat_logs LIMIT 10"}'></textarea>
-
-        <button type="button" onclick="submitForm('/query', 'queryForm', 'queryResponseArea')">
-            Execute Query
-        </button>
-    </form>
-    <div id="queryResponseArea"></div>
-</div>
-
-
-<div class="status-section">
-    <h2>Database Observation Status</h2>
-    <p id="dbStatus">Checking status...</p>
-    <h3>Last Chat Logs</h3>
-    <div id="lastLogs"></div>
 </div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         fetchDbStatus();
         setInterval(fetchDbStatus, 5000);
-        updateReplyDataPlaceholder(); // Initial placeholder setup
+        updateReplyDataPlaceholder();
     });
 
     const formatUnixTimestamp = (timestamp) => {
         const date = new Date(timestamp * 1000);
-        const year = date.getFullYear();
+        const year = String(date.getFullYear());
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         const hours = String(date.getHours()).padStart(2, '0');
@@ -260,15 +646,18 @@
             .then(response => response.json())
             .then(data => {
                 const dbStatusElement = document.getElementById('dbStatus');
+                const statusIndicator = document.getElementById('statusIndicator');
                 const lastLogsContainer = document.getElementById('lastLogs');
                 lastLogsContainer.innerHTML = '';
 
                 if (data.isObserving) {
-                    dbStatusElement.textContent = data.statusMessage + " ✅";
-                    dbStatusElement.className = 'status-good';
+                    dbStatusElement.textContent = data.statusMessage;
+                    dbStatusElement.className = 'status-text good';
+                    statusIndicator.className = 'status-indicator status-good';
                 } else {
-                    dbStatusElement.textContent = data.statusMessage + " ❌";
-                    dbStatusElement.className = 'status-bad';
+                    dbStatusElement.textContent = data.statusMessage;
+                    dbStatusElement.className = 'status-text bad';
+                    statusIndicator.className = 'status-indicator status-bad';
                 }
 
                 if (data.lastLogs && data.lastLogs.length > 0) {
@@ -296,25 +685,30 @@
                     });
                     lastLogsContainer.appendChild(table);
                 } else {
-                    lastLogsContainer.textContent = 'No recent logs.';
+                    lastLogsContainer.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">No recent logs available.</p>';
                 }
             })
             .catch(error => {
                 console.error('Error fetching DB status:', error);
                 const dbStatusElement = document.getElementById('dbStatus');
-                dbStatusElement.textContent = 'Error checking DB status ⚠️';
-                dbStatusElement.className = 'status-bad';
+                const statusIndicator = document.getElementById('statusIndicator');
+                dbStatusElement.textContent = 'Error checking DB status';
+                dbStatusElement.className = 'status-text bad';
+                statusIndicator.className = 'status-indicator status-bad';
             });
     }
-
 
     function submitForm(endpoint, formId, responseAreaId, postDataOverride) {
         const form = document.getElementById(formId);
         const responseArea = document.getElementById(responseAreaId);
-        if (responseArea) responseArea.textContent = 'Sending request...';
+
+        if (responseArea) {
+            responseArea.style.display = 'block';
+            responseArea.textContent = 'Sending request...';
+        }
 
         let formData = {};
-        if (postDataOverride) { // Use postDataOverride if provided
+        if (postDataOverride) {
             formData = postDataOverride;
         } else {
             let rawJsonTextarea = form ? form.querySelector('[name="rawJson"]') : null;
@@ -328,7 +722,7 @@
                     return;
                 }
             } else if (form) {
-                if (endpoint === '/query') { // Specific handling for /query form
+                if (endpoint === '/query') {
                     const querySqlElement = document.getElementById('querySql');
                     const queryBindElement = document.getElementById('queryBind');
                     formData['query'] = querySqlElement.value;
@@ -336,34 +730,34 @@
                         try {
                             formData['bind'] = JSON.parse(queryBindElement.value);
                         } catch(e) {
-                            alert("JSON 파싱 오류: " + e)
-                            return
+                            alert("JSON parsing error: " + e);
+                            return;
                         }
                     }
-                } else { // Existing logic for other forms (like /reply)
+                } else {
                     const replyTypeElement = form.querySelector('[name="type"]');
                     const replyDataElement = form.querySelector('[name="data"]');
-                    const messageType = replyTypeElement ? replyTypeElement.value : 'text'; // Default to text if type is not found
+                    const messageType = replyTypeElement ? replyTypeElement.value : 'text';
 
                     if (messageType === 'image_multiple') {
-                        formData['data'] = JSON.parse(replyDataElement.value); // Take the value as string for image_multiple - it's already JSON string
+                        formData['data'] = JSON.parse(replyDataElement.value);
                     } else {
-                        formData['data'] = replyDataElement.value; // For other types, take value as string as well
+                        formData['data'] = replyDataElement.value;
                     }
 
                     for (let element of form.elements) {
-                        if (element.name && element.name !== 'rawJson' && element.name !== 'data' && element.name !== 'type') { // Exclude 'data', 'type' and 'rawJson'
+                        if (element.name && element.name !== 'rawJson' && element.name !== 'data' && element.name !== 'type') {
                             formData[element.name] = element.value;
                         }
                     }
-                    if (replyTypeElement) { // Explicitly add type from dropdown
+                    if (replyTypeElement) {
                         formData['type'] = replyTypeElement.value;
                     }
                 }
             }
         }
 
-        console.log("Sending FormData:", formData); // Add this line for debugging
+        console.log("Sending FormData:", formData);
 
         fetch(endpoint, {
             method: 'POST',
@@ -411,8 +805,7 @@
             replyDataTextarea.placeholder = 'Enter base64 encoded image data';
         } else if (replyType.value === 'image_multiple') {
             replyDataTextarea.placeholder = 'Enter base64 encoded image data JSON Array';
-        }
-        else {
+        } else {
             replyDataTextarea.placeholder = 'Enter message text';
         }
     }
