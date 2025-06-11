@@ -78,8 +78,8 @@
         }
 
         .header {
-            text-align: center;
-            margin-bottom: 4rem;
+            text-align: left;
+            margin-bottom: 1rem;
             position: relative;
         }
 
@@ -103,13 +103,14 @@
         }
 
         .header h1 {
-            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-size: clamp(2rem, 2vw, 4rem);
             font-weight: 800;
             background: linear-gradient(135deg, var(--text-primary) 0%, var(--primary-light) 50%, var(--accent-color) 100%);
             background-clip: text;
             -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            -webkit-text-fill-color: #ffffff;
             margin-bottom: 0.5rem;
+            margin-left: 1rem;
             letter-spacing: -0.02em;
             position: relative;
         }
@@ -192,7 +193,7 @@
         .config-item {
             background: var(--glass-bg);
             backdrop-filter: blur(10px);
-            padding: 2rem;
+            padding: 1rem;
             border-radius: var(--radius-lg);
             border: 1px solid var(--glass-border);
             transition: all 0.3s ease;
@@ -226,7 +227,7 @@
             /* Adjusted: Smaller font size for inner card titles */
             font-size: 1.125rem; /* Reduced from 1.375rem */
             font-weight: 700;
-            color: var(--primary-light);
+            color: var(--text-primary);
             margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
@@ -249,7 +250,7 @@
         label {
             display: block;
             font-weight: 600;
-            color: var(--text-primary);
+            color: var(--text-secondary);
             margin-bottom: 0.75rem;
             font-size: 0.875rem;
             text-transform: uppercase;
@@ -505,13 +506,14 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(var(--warning-color), 0.3);
             color: var(--warning-color);
-            padding: 1.25rem;
+            padding: 0rem;
             border-radius: var(--radius-md);
             margin-top: 1rem;
             display: flex;
             align-items: center;
             gap: 0.75rem;
             font-weight: 500;
+            font-size: 0.8rem;
         }
 
         .input-buttons-group {
@@ -560,7 +562,7 @@
             }
 
             .header {
-                margin-bottom: 2rem;
+                margin-bottom: 0rem;
             }
 
             .card-body {
@@ -835,7 +837,7 @@
 
     <div class="status-section">
         <div class="status-header">
-            <h2><i class="fas fa-heartbeat"></i> Database Observation Status</h2>
+            <h2><i class="fas fa-heartbeat"></i> DB Status</h2>
         </div>
         <div class="status-header">
             <div class="status-indicator" id="statusIndicator"></div>
