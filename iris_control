@@ -6,7 +6,7 @@ IRIS_START_COMMAND="adb shell 'su root sh -c \"CLASSPATH=/data/local/tmp/Iris.ap
 IRIS_APK_URL="https://github.com/dolidolih/Iris/releases/latest/download/Iris.apk"
 IRIS_APK_PATH="/data/local/tmp/Iris.apk"
 IRIS_APK_LOCAL_FILE="Iris.apk"
-IRIS_MD5_URL="${IRIS_APK_URL}.MD5"
+IRIS_MD5_URL="${IRIS_APK_URL}.MD5"  
 
 check_adb_installed() {
   if ! command -v adb &> /dev/null
