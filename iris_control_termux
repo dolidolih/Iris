@@ -1,0 +1,216 @@
+#!/data/data/com/termux/files/usr/bin/bash
+# --- Configuration ---
+# Process identifiers used to find if Iris is running
+IRIS_PROCESS_NAME="qwer"
+IRIS_PROCESS_KEYWORD="app_process"
+# Iris application details
+IRIS_MAIN_CLASS="party.qwer.iris.Main"
+IRIS_APK_URL="https://github.com/dolidolih/Iris/releases/latest/download/Iris.apk"
+IRIS_APK_PATH="/data/local/tmp/Iris.apk"
+# Local file names used during installation
+IRIS_APK_LOCAL_FILE="Iris.apk"
+IRIS_MD5_URL="${IRIS_APK_URL}.MD5"
+# Log file for the 'start' command
+IRIS_LOG_FILE="iris.log"
+
+# --- Functions ---
+
+check_root() {
+  if ! su -c "echo 0" >/dev/null 2>&1; then
+    echo "Root access is required. Please grant root permissions to Termux (e.g., via Magisk)."
+    return 1
+  fi
+  return 0
+}
+
+get_iris_pid() {
+  # Use 'su root ps' to ensure we can see processes running as root
+  # Added 'grep -v grep' to prevent matching the grep command itself
+  pid=$(su root ps -ef | grep "$IRIS_PROCESS_NAME" | grep "$IRIS_PROCESS_KEYWORD" | grep -v 'grep' | grep -v 'sh -c' | awk '{print $2}')
+  echo "$pid"
+}
+
+iris_status() {
+  pid=$(get_iris_pid)
+  if [ -n "$pid" ]; then
+    echo "Iris is working. PID: $pid"
+  else
+    echo "Iris is not running."
+  fi
+}
+
+# --- MODIFIED FUNCTION ---
+iris_start() {
+  pid=$(get_iris_pid)
+  if [ -n "$pid" ]; then
+    echo "Iris is already running. Please stop it first."
+    return 1
+  fi
+
+  # Trap SIGINT (Ctrl+C) and call iris_stop for a clean exit
+  trap 'echo -e "\nCtrl+C pressed. Stopping Iris..."; iris_stop; exit 130' INT
+
+  # Check if the first argument to this function is -v (verbose)
+  if [[ "$1" == "-v" || "$1" == "--verbose" ]]; then
+    echo "Starting Iris in VERBOSE mode..."
+    echo "Logs will be shown here AND saved to '${IRIS_LOG_FILE}'. Press Ctrl+C to stop."
+    # The 'tee -a' command duplicates the output stream.
+    # It shows output on the screen AND appends it to the log file.
+    # 2>&1 ensures both stdout and stderr are piped to tee.
+    su root sh -c "CLASSPATH=${IRIS_APK_PATH} app_process / ${IRIS_MAIN_CLASS}" 2>&1 | tee -a "${IRIS_LOG_FILE}" &
+  else
+    echo "Starting Iris service..."
+    echo "All logs will be saved to '${IRIS_LOG_FILE}'. Press Ctrl+C to stop."
+    # The main command to start Iris, running as root.
+    # Using '>>' to append to the log file instead of overwriting it.
+    su root sh -c "CLASSPATH=${IRIS_APK_PATH} app_process / ${IRIS_MAIN_CLASS}" >> "${IRIS_LOG_FILE}" 2>&1 &
+  fi
+
+  # Get the Process ID of the background command we just launched
+  # In verbose mode, this will be the PID of 'tee', which is fine.
+  local iris_child_pid=$!
+
+  sleep 1 # Give it a moment to start and potentially fail
+
+  # Check if the process actually started
+  if ! kill -0 $iris_child_pid 2>/dev/null; then
+      echo "Failed to start Iris. Check logs in '${IRIS_LOG_FILE}' for errors."
+      # Clean up the trap
+      trap - INT
+      return 1
+  fi
+
+  # Use get_iris_pid to show the actual Iris process PID
+  local actual_pid
+  sleep 1 # Give the process a bit more time to be discoverable
+  actual_pid=$(get_iris_pid)
+  if [ -n "$actual_pid" ]; then
+    echo "Iris is running. (PID: $actual_pid)"
+  else
+    echo "Iris started but the main process could not be found immediately."
+  fi
+
+  # Wait for the background process (either the 'su' command or 'tee') to terminate.
+  # This makes the script wait here until Iris stops or Ctrl+C is pressed.
+  wait $iris_child_pid
+
+  # Clean up the trap after the process has finished naturally
+  trap - INT
+  echo "Iris has stopped."
+}
+# --- END MODIFIED FUNCTION ---
+
+iris_stop() {
+  pid=$(get_iris_pid)
+  if [ -n "$pid" ]; then
+    echo "Stopping Iris service (PID: $pid)..."
+    # Use 'su root' to ensure we have permission to kill the root process
+    su root sh -c "kill -s SIGKILL $pid"
+    sleep 1
+    # Verify it was stopped
+    if [ -z "$(get_iris_pid)" ]; then
+      echo "Iris service stopped."
+    else
+      echo "Failed to stop Iris service (PID: $pid may still be running)."
+    fi
+  else
+    echo "Iris is not running."
+  fi
+}
+
+iris_install() {
+  echo "Downloading Iris.apk and MD5 checksum..."
+  # Use curl if available, otherwise try wget
+  if command -v curl &>/dev/null; then
+    curl -Lo "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_URL" && curl -Lo "$IRIS_APK_LOCAL_FILE.MD5" "$IRIS_MD5_URL"
+  elif command -v wget &>/dev/null; then
+    wget -O "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_URL" && wget -O "$IRIS_APK_LOCAL_FILE.MD5" "$IRIS_MD5_URL"
+  else
+    echo "Error: 'curl' or 'wget' is not installed. Please install one of them ('pkg install curl')."
+    return 1
+  fi
+
+  if [ ! -f "$IRIS_APK_LOCAL_FILE" ]; then
+      echo "Failed to download Iris.apk. Please check the URL and your internet connection."
+      return 1
+  fi
+
+  if [ -f "$IRIS_APK_LOCAL_FILE.MD5" ]; then
+    echo "Verifying MD5 checksum..."
+    # On Android/Termux, md5sum is often not available, but 'md5' might be.
+    if command -v md5sum &>/dev/null; then
+      calculated_md5=$(md5sum "$IRIS_APK_LOCAL_FILE" | awk '{print $1}')
+    elif command -v md5 &>/dev/null; then # Fallback for some systems
+      calculated_md5=$(md5 -q "$IRIS_APK_LOCAL_FILE")
+    else
+      echo "Warning: md5sum/md5 command not found. Skipping checksum verification."
+      calculated_md5=""
+    fi
+
+    if [ -n "$calculated_md5" ]; then
+        downloaded_md5=$(cat "$IRIS_APK_LOCAL_FILE.MD5" | awk '{print $1}')
+        # Case-insensitive comparison
+        if [ "${downloaded_md5,,}" != "${calculated_md5,,}" ]; then
+            echo "MD5 checksum mismatch! Downloaded file may be corrupted."
+            rm "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_LOCAL_FILE.MD5"
+            return 1
+        fi
+        echo "MD5 checksum verification passed."
+    fi
+  else
+      echo "Warning: MD5 file not downloaded. Skipping checksum verification."
+  fi
+
+  echo "Moving verified Iris.apk to ${IRIS_APK_PATH}..."
+  # Use 'su root' to move the file to a system location and set permissions
+  su root sh -c "mv '${PWD}/${IRIS_APK_LOCAL_FILE}' '${IRIS_APK_PATH}' && chmod 644 '${IRIS_APK_PATH}'"
+  if [ $? -ne 0 ]; then
+    echo "Failed to move Iris.apk to ${IRIS_APK_PATH}. Check root permissions."
+    # Clean up the leftover MD5 file
+    rm -f "$IRIS_APK_LOCAL_FILE.MD5"
+    return 1
+  fi
+
+  echo "Verifying installation..."
+  su root ls "${IRIS_APK_PATH}" >/dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    echo "Installation completed successfully!"
+  else
+    echo "Installation verification failed. File is not at ${IRIS_APK_PATH}."
+  fi
+
+  # Clean up the MD5 file
+  rm -f "$IRIS_APK_LOCAL_FILE.MD5"
+}
+
+
+# --- Main Logic ---
+
+# Check for root access before proceeding with any command
+check_root || exit 1
+
+case "$1" in
+  status)
+    iris_status
+    ;;
+  # --- MODIFIED CASE ---
+  start)
+    # Pass the second argument ($2) to the iris_start function.
+    # This will be '-v' if the user provides it.
+    iris_start "$2"
+    ;;
+  # --- END MODIFIED CASE ---
+  stop)
+    iris_stop
+    ;;
+  install)
+    iris_install
+    ;;
+  *)
+    # --- MODIFIED USAGE ---
+    echo "Usage: $0 {status|start [-v]|stop|install}"
+    exit 1
+    ;;
+esac
+
+exit 0
