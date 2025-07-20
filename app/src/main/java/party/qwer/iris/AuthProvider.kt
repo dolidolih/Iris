@@ -63,8 +63,9 @@ object AuthProvider {
     }
 
     private fun readFiles(): Array<String> {
-        val prefsFilePath = "/data/data/com.kakao.talk/shared_prefs/KakaoTalk.hw.perferences.xml"
-        val aotFilePath = "/data/data/com.kakao.talk/aot"
+        val appPath = PathUtils.getAppPath()
+        val prefsFilePath = "${appPath}shared_prefs/KakaoTalk.hw.perferences.xml"
+        val aotFilePath = "${appPath}aot"
 
         val prefsFile = File(prefsFilePath)
         val aotFile = File(aotFilePath)

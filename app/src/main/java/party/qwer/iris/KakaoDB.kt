@@ -14,7 +14,7 @@ class KakaoDB {
     init {
         try {
             connection = SQLiteDatabase.openDatabase(
-                DB_PATH + "/KakaoTalk.db", null, SQLiteDatabase.OPEN_READWRITE
+                "$DB_PATH/KakaoTalk.db", null, SQLiteDatabase.OPEN_READWRITE
             )
             connection.execSQL("ATTACH DATABASE '$DB_PATH/KakaoTalk2.db' AS db2")
             connection.execSQL("ATTACH DATABASE '$DB_PATH/multi_profile_database.db' AS db3")
@@ -163,7 +163,7 @@ class KakaoDB {
     }
 
     companion object {
-        private const val DB_PATH = "/data/data/com.kakao.talk/databases"
+        private val DB_PATH = "${PathUtils.getAppPath()}databases"
         fun decryptRow(row: Map<String, String?>): Map<String, String?> {
             @Suppress("NAME_SHADOWING") var row = row.toMutableMap()
 

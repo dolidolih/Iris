@@ -45,8 +45,8 @@ class Main {
         }
 
         private fun readNotificationReferer(): String {
-            val prefsFile =
-                File("/data/data/com.kakao.talk/shared_prefs/KakaoTalk.hw.perferences.xml")
+            val appPath = PathUtils.getAppPath()
+            val prefsFile = File("${appPath}shared_prefs/KakaoTalk.hw.perferences.xml")
             val data = prefsFile.bufferedReader().use {
                 it.readText()
             }
