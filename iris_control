@@ -1,12 +1,20 @@
 #!/bin/bash
 
+# --- Configuration ---
 IRIS_PROCESS_NAME="qwer"
 IRIS_PROCESS_KEYWORD="app_process"
-IRIS_START_COMMAND="adb shell 'su root sh -c \"CLASSPATH=/data/local/tmp/Iris.apk app_process / party.qwer.iris.Main > /dev/null 2>&1\"' &"
+# IRIS_START_COMMAND no longer includes 'adb shell'. This is now handled by the ADB_CMD variable.
+IRIS_START_COMMAND="'su root sh -c \"CLASSPATH=/data/local/tmp/Iris.apk app_process / party.qwer.iris.Main > /dev/null 2>&1\"' &"
 IRIS_APK_URL="https://github.com/dolidolih/Iris/releases/latest/download/Iris.apk"
 IRIS_APK_PATH="/data/local/tmp/Iris.apk"
 IRIS_APK_LOCAL_FILE="Iris.apk"
 IRIS_MD5_URL="${IRIS_APK_URL}.MD5"
+
+# --- Global Variables ---
+# This will be set by select_adb_device() to something like "adb -s emulator-5554"
+ADB_CMD=""
+
+# --- Functions ---
 
 check_adb_installed() {
   if ! command -v adb &> /dev/null
@@ -18,40 +26,60 @@ check_adb_installed() {
   return 0
 }
 
-check_adb_device() {
-  adb devices > /dev/null 2>&1
-  adb devices | grep -q "device"
-  if [ $? -ne 0 ]; then
-    echo "No device found. Please ensure your Android device is connected via USB or network."
-    read -p "If using network, enter device IP address: " device_ip
-    if [ -n "$device_ip" ]; then
-      adb connect "$device_ip"
-      sleep 3
-      adb devices | grep -q "device"
-      if [ $? -ne 0 ]; then
-        echo "Failed to connect to device at $device_ip. Please check IP and device status."
-        return 1
-      else
-        echo "Successfully connected to device at $device_ip."
-        return 0
-      fi
-    else
-      echo "No device IP provided. Please connect a device."
+# New function to handle device selection
+select_adb_device() {
+  # If a device has already been selected, do nothing.
+  if [ -n "$ADB_CMD" ]; then
+    return 0
+  fi
+
+  echo "Searching for connected devices..."
+  # Get a list of devices in the 'device' state, excluding the header
+  # mapfile is a bash 4+ feature to read lines into an array
+  mapfile -t devices < <(adb devices | grep -w "device" | grep -v "List of devices" | awk '{print $1}')
+
+  local num_devices=${#devices[@]}
+
+  if [ "$num_devices" -eq 0 ]; then
+    echo "Error: No adb devices found in 'device' state."
+    echo "Please connect a device via USB (with debugging enabled) or use 'adb connect <ip>:<port>'."
+    return 1
+  elif [ "$num_devices" -eq 1 ]; then
+    local device_id="${devices[0]}"
+    echo "Found 1 device. Using: $device_id"
+    ADB_CMD="adb -s $device_id"
+    return 0
+  else
+    echo "Multiple devices found. Please choose one to use:"
+    local i=1
+    for device in "${devices[@]}"; do
+      echo "  $i) $device"
+      i=$((i+1))
+    done
+
+    local choice
+    read -p "Enter number (1-$num_devices): " choice
+
+    # Validate input
+    if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt "$num_devices" ]; then
+      echo "Error: Invalid selection."
       return 1
     fi
-  else
+
+    local device_id="${devices[$((choice-1))]}"
+    echo "Using device: $device_id"
+    ADB_CMD="adb -s $device_id"
     return 0
   fi
 }
 
 get_iris_pid() {
-  check_adb_device || return 1
-  pid=$(adb shell ps -f | grep "$IRIS_PROCESS_NAME" | grep "$IRIS_PROCESS_KEYWORD" | grep -v 'sh -c' | awk '{print $2}')
+  # ADB_CMD already includes the -s flag if needed
+  pid=$($ADB_CMD shell ps -f | grep "$IRIS_PROCESS_NAME" | grep "$IRIS_PROCESS_KEYWORD" | grep -v 'sh -c' | awk '{print $2}')
   echo "$pid"
 }
 
 iris_status() {
-  check_adb_device || return 1
   pid=$(get_iris_pid)
   if [ -n "$pid" ]; then
     echo "Iris is working. PID: $pid"
@@ -61,13 +89,13 @@ iris_status() {
 }
 
 iris_start() {
-  check_adb_device || return 1
   pid=$(get_iris_pid)
   if [ -n "$pid" ]; then
     echo "Iris is already running."
   else
-    echo "Starting Iris service..."
-    eval "$IRIS_START_COMMAND"
+    echo "Starting Iris service in the background..."
+    # The 'adb shell' part is now constructed dynamically with the correct device
+    eval "$ADB_CMD shell $IRIS_START_COMMAND"
     sleep 2
     new_pid=$(get_iris_pid)
     if [ -n "$new_pid" ]; then
@@ -78,12 +106,28 @@ iris_start() {
   fi
 }
 
+iris_start_foreground() {
+  pid=$(get_iris_pid)
+  if [ -n "$pid" ]; then
+    echo "Iris is already running (PID: $pid). Please stop it first with '$0 stop'."
+    return 1
+  fi
+
+  echo "Starting Iris in foreground..."
+  echo "Logs will be displayed below. Press Ctrl+C to exit verbose mode.(You will need to run iris_control stop to stop the process."
+
+  # Execute the command without output redirection or backgrounding.
+  # This will block the script and show logs in the current terminal.
+  # Ctrl+C will terminate the adb process, which in turn stops the remote command.
+  $ADB_CMD shell "su root sh -c \"CLASSPATH=${IRIS_APK_PATH} app_process / party.qwer.iris.Main\""
+
+}
+
 iris_stop() {
-  check_adb_device || return 1
   pid=$(get_iris_pid)
   if [ -n "$pid" ]; then
     echo "Stopping Iris service..."
-    adb shell "su root sh -c 'kill -s SIGKILL $pid'"
+    $ADB_CMD shell "su root sh -c 'kill -s SIGKILL $pid'"
     sleep 1
     stopped_pid=$(get_iris_pid)
     if [ -z "$stopped_pid" ]; then
@@ -97,9 +141,6 @@ iris_stop() {
 }
 
 iris_install() {
-  check_adb_installed || return 1
-  check_adb_device || return 1
-
   echo "Downloading Iris.apk and MD5 checksum..."
   if curl -Lo "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_URL"; then
     echo "Iris.apk download completed."
@@ -117,14 +158,14 @@ iris_install() {
   else
     echo "Failed to download MD5 checksum. Skipping MD5 check."
     echo "Pushing Iris.apk to device..."
-    adb push "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_PATH"
+    $ADB_CMD push "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_PATH"
     if [ $? -ne 0 ]; then
       echo "Failed to push Iris.apk to /data/local/tmp. Check adb connection and permissions."
       return 1
     fi
 
     echo "Verifying installation..."
-    adb shell "ls $IRIS_APK_PATH" > /dev/null 2>&1
+    $ADB_CMD shell "ls $IRIS_APK_PATH" > /dev/null 2>&1
     if [ $? -eq 0 ]; then
       echo "Installation completed (without MD5 check)!"
     else
@@ -147,14 +188,14 @@ iris_install() {
   echo "MD5 checksum verification passed."
 
   echo "Pushing verified Iris.apk to device..."
-  adb push "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_PATH"
+  $ADB_CMD push "$IRIS_APK_LOCAL_FILE" "$IRIS_APK_PATH"
   if [ $? -ne 0 ]; then
     echo "Failed to push Iris.apk to /data/local/tmp. Check adb connection and permissions."
     return 1
   fi
 
   echo "Verifying installation..."
-  adb shell "ls $IRIS_APK_PATH" > /dev/null 2>&1
+  $ADB_CMD shell "ls $IRIS_APK_PATH" > /dev/null 2>&1
   if [ $? -eq 0 ]; then
     echo "Installation completed successfully!"
   else
@@ -230,12 +271,25 @@ EOF
 }
 
 
+# --- Main Logic ---
+
+# Check if the command requires an adb device. If so, run the prerequisite checks.
+if [[ "$1" == "status" || "$1" == "start" || "$1" == "stop" || "$1" == "install" ]]; then
+  check_adb_installed || exit 1
+  # select_adb_device will prompt user if needed and set the global ADB_CMD variable
+  select_adb_device || exit 1
+fi
+
 case "$1" in
   status)
     iris_status
     ;;
   start)
-    iris_start
+    if [[ "$2" == "-v" || "$2" == "--verbose" ]]; then
+      iris_start_foreground
+    else
+      iris_start
+    fi
     ;;
   stop)
     iris_stop
@@ -247,7 +301,7 @@ case "$1" in
     iris_install_redroid
     ;;
   *)
-    echo "Usage: $0 {status|start|stop|install|install_redroid}"
+    echo "Usage: $0 {status|start [-v|--verbose]|stop|install|install_redroid}"
     exit 1
     ;;
 esac
