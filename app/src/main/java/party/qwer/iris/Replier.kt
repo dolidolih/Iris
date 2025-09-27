@@ -56,19 +56,22 @@ class Replier {
         }
 
         private fun sendMessageInternal(referer: String, chatId: Long, msg: String) {
+            val replyKey = "reply_message"
             val intent = Intent().apply {
                 component = ComponentName(
-                    "com.kakao.talk", "com.kakao.talk.notification.NotificationActionService"
+                    "com.kakao.talk",
+                    "com.kakao.talk.notification.NotificationActionService"
                 )
-                putExtra("noti_referer", referer)
-                putExtra("chat_id", chatId)
                 action = "com.kakao.talk.notification.REPLY_MESSAGE"
+                putExtra("chat_id", chatId)
+                putExtra("noti_referer", referer)
+                putExtra("is_chat_thread_notification", false)
 
                 val results = Bundle().apply {
-                    putCharSequence("reply_message", msg)
+                    putCharSequence(replyKey, msg)
                 }
 
-                val remoteInput = RemoteInput.Builder("reply_message").build()
+                val remoteInput = RemoteInput.Builder(replyKey).build()
                 RemoteInput.addResultsToIntent(arrayOf(remoteInput), this, results)
             }
 
