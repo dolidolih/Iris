@@ -168,7 +168,7 @@ class IrisServer(
                     val replyRequest = call.receive<ReplyRequest>()
                     val roomId = replyRequest.room.toLong()
 
-                    val sendResult = when (replyRequest.type) {
+                    when (replyRequest.type) {
                         ReplyType.TEXT -> Replier.sendMessage(
                             notificationReferer, roomId, replyRequest.data.jsonPrimitive.content,
                         )
@@ -182,18 +182,7 @@ class IrisServer(
                             replyRequest.data.jsonArray.map { it.jsonPrimitive.content })
                     }
 
-                    sendResult
-                        .onSuccess {
-                            call.respond(ApiResponse(success = true, message = "success"))
-                        }
-                        .onFailure { throwable ->
-                            call.respond(
-                                HttpStatusCode.BadGateway,
-                                CommonErrorResponse(
-                                    message = throwable.message ?: "failed to deliver reply"
-                                )
-                            )
-                        }
+                    call.respond(ApiResponse(success = true, message = "success"))
                 }
 
                 post("/query") {

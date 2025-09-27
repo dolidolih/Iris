@@ -6,8 +6,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Base64
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -17,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import party.qwer.iris.Replier.Companion.SendMessageRequest
 import java.io.File
 
 // SendMsg : ye-seola/go-kdb
@@ -39,22 +38,14 @@ class Replier {
                 }
                 messageSenderJob = launch {
                     for (request in messageChannel) {
-                        val deferred = request.result
-                        val result = try {
+                        try {
                             mutex.withLock {
                                 request.send()
                                 delay(Configurable.messageSendRate)
                             }
-                            Result.success(Unit)
-                        } catch (e: CancellationException) {
-                            deferred?.completeExceptionally(e)
-                            throw e
-                        } catch (e: Throwable) {
+                        } catch (e: Exception) {
                             System.err.println("Error sending message from channel: $e")
-                            Result.failure(e)
                         }
-
-                        deferred?.complete(result)
                     }
                 }
             }
@@ -87,28 +78,34 @@ class Replier {
             AndroidHiddenApi.startService(intent)
         }
 
-        suspend fun sendMessage(referer: String, chatId: Long, msg: String): Result<Unit> {
-            return enqueueSendRequest {
-                sendMessageInternal(
-                    referer, chatId, msg
-                )
+        fun sendMessage(referer: String, chatId: Long, msg: String) {
+            coroutineScope.launch {
+                messageChannel.send(SendMessageRequest {
+                    sendMessageInternal(
+                        referer, chatId, msg
+                    )
+                })
             }
         }
 
 
-        suspend fun sendPhoto(room: Long, base64ImageDataString: String): Result<Unit> {
-            return enqueueSendRequest {
-                sendPhotoInternal(
-                    room, base64ImageDataString
-                )
+        fun sendPhoto(room: Long, base64ImageDataString: String) {
+            coroutineScope.launch {
+                messageChannel.send(SendMessageRequest {
+                    sendPhotoInternal(
+                        room, base64ImageDataString
+                    )
+                })
             }
         }
 
-        suspend fun sendMultiplePhotos(room: Long, base64ImageDataStrings: List<String>): Result<Unit> {
-            return enqueueSendRequest {
-                sendMultiplePhotosInternal(
-                    room, base64ImageDataStrings
-                )
+        fun sendMultiplePhotos(room: Long, base64ImageDataStrings: List<String>) {
+            coroutineScope.launch {
+                messageChannel.send(SendMessageRequest {
+                    sendMultiplePhotosInternal(
+                        room, base64ImageDataStrings
+                    )
+                })
             }
         }
 
@@ -159,16 +156,10 @@ class Replier {
             }
         }
 
-        private suspend fun enqueueSendRequest(block: suspend () -> Unit): Result<Unit> {
-            val deferred = CompletableDeferred<Result<Unit>>()
-            messageChannel.send(SendMessageRequest(block, deferred))
-            return deferred.await()
-        }
 
-        internal data class SendMessageRequest(
-            val send: suspend () -> Unit,
-            val result: CompletableDeferred<Result<Unit>>?
-        )
+        internal fun interface SendMessageRequest {
+            suspend fun send()
+        }
 
         private fun mediaScan(uri: Uri) {
             val mediaScanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE).apply {
