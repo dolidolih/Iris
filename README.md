@@ -76,6 +76,13 @@ Iris는 기본적으로 HTTP 프로토콜을 통해 정보를 주고 받습니�
     curl -X POST -H "Content-Type: application/json" -d '{"type": "image_multiple", "room": "1234567890", "data": [BASE64_ENCODED_IMAGE_DATA1,BASE64_ENCODED_IMAGE_DATA2,BASE64_ENCODED_IMAGE_DATA3]}' http://[YOUR_DEVICE_IP]:[bot_http_port]/reply
     ```
 
+    **수동 QA (카카오톡이 인텐트를 거부할 때 오류 표면화 확인):**
+
+    1. `adb shell pm disable-user com.kakao.talk` 명령어로 기기에서 카카오톡 앱을 일시적으로 비활성화합니다.
+    2. 위 예시와 같은 `/reply` 요청을 실행합니다.
+    3. Iris가 `502 Bad Gateway`와 함께 `com.kakao.talk` 관련 `ActivityNotFoundException` 오류 메시지를 반환하는지 확인합니다.
+    4. `adb shell pm enable com.kakao.talk`으로 카카오톡을 다시 활성화합니다.
+
 *   **`/query`**: 카카오톡 데이터베이스에 SQL 쿼리를 실행합니다. 이 메소드는 응답에서 암호화된 데이터 필드를 자동으로 복호화합니다.
     > `message` 또는 `attachment`를 `user_id` 및 `enc`와 함께 쿼리하면 복호화된 값을 반환합니다.
     > `nickname`, `profile_image_url`, `full_profile_image_url` 또는 `original_profile_image_url`을 `enc`와 함께 쿼리하면 복호화된 값을 반환합니다.
