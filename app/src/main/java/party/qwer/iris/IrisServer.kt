@@ -18,9 +18,17 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
+import io.ktor.websocket.Frame
 import io.ktor.websocket.send
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -166,21 +174,7 @@ class IrisServer(
 
                 post("/reply") {
                     val replyRequest = call.receive<ReplyRequest>()
-                    val roomId = replyRequest.room.toLong()
-
-                    when (replyRequest.type) {
-                        ReplyType.TEXT -> Replier.sendMessage(
-                            notificationReferer, roomId, replyRequest.data.jsonPrimitive.content,
-                        )
-
-                        ReplyType.IMAGE -> Replier.sendPhoto(
-                            roomId, replyRequest.data.jsonPrimitive.content
-                        )
-
-                        ReplyType.IMAGE_MULTIPLE -> Replier.sendMultiplePhotos(
-                            roomId,
-                            replyRequest.data.jsonArray.map { it.jsonPrimitive.content })
-                    }
+                    handleReplyRequest(replyRequest)
 
                     call.respond(ApiResponse(success = true, message = "success"))
                 }
@@ -212,11 +206,80 @@ class IrisServer(
                 }
 
                 webSocket("/ws") {
-                    sharedFlow.collect { msg ->
-                        send(msg)
+                    val sendMutex = Mutex()
+                    val broadcastJob = launch {
+                        sharedFlow.collect { msg ->
+                            sendMutex.withLock {
+                                send(msg)
+                            }
+                        }
+                    }
+
+                    try {
+                        for (frame in incoming) {
+                            if (frame is Frame.Text) {
+                                val payload = frame.readText()
+                                if (payload.isBlank()) {
+                                    continue
+                                }
+
+                                try {
+                                    val replyRequest = Json.decodeFromString<ReplyRequest>(payload)
+                                    handleReplyRequest(replyRequest)
+                                    sendMutex.withLock {
+                                        send(
+                                            Json.encodeToString<ApiResponse<String>>(ApiResponse(
+                                                success = true,
+                                                message = "success",
+                                            ))
+                                        )
+                                    }
+                                } catch (e: SerializationException) {
+                                    println("Failed to parse WebSocket payload as ReplyRequest: ${e.message}")
+                                    sendMutex.withLock {
+                                        send(
+                                            Json.encodeToString<ApiResponse<String>>(ApiResponse(
+                                                success = false,
+                                                message = "Invalid payload",
+                                            ))
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    println("Failed to handle WebSocket reply request: ${e.message}")
+                                    sendMutex.withLock {
+                                        send(
+                                            Json.encodeToString<ApiResponse<String>>(ApiResponse(
+                                                success = false,
+                                                message = e.message ?: "unknown error",
+                                            ))
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } finally {
+                        broadcastJob.cancelAndJoin()
                     }
                 }
             }
         }.start(wait = true)
+    }
+
+    private fun handleReplyRequest(replyRequest: ReplyRequest) {
+        val roomId = replyRequest.room.toLong()
+
+        when (replyRequest.type) {
+            ReplyType.TEXT -> Replier.sendMessage(
+                notificationReferer, roomId, replyRequest.data.jsonPrimitive.content,
+            )
+
+            ReplyType.IMAGE -> Replier.sendPhoto(
+                roomId, replyRequest.data.jsonPrimitive.content
+            )
+
+            ReplyType.IMAGE_MULTIPLE -> Replier.sendMultiplePhotos(
+                roomId,
+                replyRequest.data.jsonArray.map { it.jsonPrimitive.content })
+        }
     }
 }
