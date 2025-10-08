@@ -160,17 +160,24 @@ class IrisServer(
                     val aotToken = AuthProvider.getToken()
 
                     call.respond(
-                        AotResponse(success = true, aot = Json.parseToJsonElement(aotToken.toString()).jsonObject)
+                        AotResponse(
+                            success = true,
+                            aot = Json.parseToJsonElement(aotToken.toString()).jsonObject
+                        )
                     )
                 }
 
                 post("/reply") {
                     val replyRequest = call.receive<ReplyRequest>()
                     val roomId = replyRequest.room.toLong()
+                    val threadId = replyRequest.threadId?.toLong()
 
                     when (replyRequest.type) {
                         ReplyType.TEXT -> Replier.sendMessage(
-                            notificationReferer, roomId, replyRequest.data.jsonPrimitive.content,
+                            notificationReferer,
+                            roomId,
+                            replyRequest.data.jsonPrimitive.content,
+                            threadId
                         )
 
                         ReplyType.IMAGE -> Replier.sendPhoto(
@@ -189,7 +196,8 @@ class IrisServer(
                     val queryRequest = call.receive<QueryRequest>()
 
                     try {
-                        val rows = kakaoDB.executeQuery(queryRequest.query,
+                        val rows = kakaoDB.executeQuery(
+                            queryRequest.query,
                             (queryRequest.bind?.map { it.content } ?: listOf()).toTypedArray())
 
                         call.respond(QueryResponse(data = rows.map {
