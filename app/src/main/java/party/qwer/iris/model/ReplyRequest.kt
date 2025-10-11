@@ -8,4 +8,5 @@ data class ReplyRequest(
     val type: ReplyType = ReplyType.TEXT,
     val room: String,
     val data: JsonElement,
+    val threadId: String? = null,
 )

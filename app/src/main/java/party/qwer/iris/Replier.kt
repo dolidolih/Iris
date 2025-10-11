@@ -55,13 +55,24 @@ class Replier {
             startMessageSender()
         }
 
-        private fun sendMessageInternal(referer: String, chatId: Long, msg: String) {
+        private fun sendMessageInternal(
+            referer: String,
+            chatId: Long,
+            msg: String,
+            threadId: Long?
+        ) {
             val intent = Intent().apply {
                 component = ComponentName(
                     "com.kakao.talk", "com.kakao.talk.notification.NotificationActionService"
                 )
                 putExtra("noti_referer", referer)
                 putExtra("chat_id", chatId)
+
+                putExtra("is_chat_thread_notification", threadId != null)
+                if (threadId != null) {
+                    putExtra("thread_id", threadId)
+                }
+
                 action = "com.kakao.talk.notification.REPLY_MESSAGE"
 
                 val results = Bundle().apply {
@@ -75,11 +86,11 @@ class Replier {
             AndroidHiddenApi.startService(intent)
         }
 
-        fun sendMessage(referer: String, chatId: Long, msg: String) {
+        fun sendMessage(referer: String, chatId: Long, msg: String, threadId: Long?) {
             coroutineScope.launch {
                 messageChannel.send(SendMessageRequest {
                     sendMessageInternal(
-                        referer, chatId, msg
+                        referer, chatId, msg, threadId
                     )
                 })
             }
