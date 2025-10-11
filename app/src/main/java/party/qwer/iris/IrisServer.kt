@@ -18,9 +18,18 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
+import io.ktor.websocket.Frame
+import io.ktor.websocket.readText
 import io.ktor.websocket.send
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -46,101 +55,7 @@ class IrisServer(
     private val notificationReferer: String,
     private val wsBroadcastFlow: MutableSharedFlow<String>
 ) {
-    val sharedFlow = wsBroadcastFlow.asSharedFlow()
-
-    fun startServer() {
-        embeddedServer(Netty, port = Configurable.botSocketPort) {
-            install(WebSockets) {
-                contentConverter = KotlinxWebsocketSerializationConverter(Json)
-            }
-
-            install(ContentNegotiation) {
-                json()
-            }
-
-            install(StatusPages) {
-                exception<Throwable> { call, cause ->
-                    call.respond(
-                        HttpStatusCode.InternalServerError, CommonErrorResponse(
-                            message = cause.message ?: "unknown error"
-                        )
-                    )
-                }
-            }
-
-            routing {
-                route("/dashboard") {
-                    get {
-                        val html = PageRenderer.renderDashboard()
-                        call.respondText(html, ContentType.Text.Html)
-                    }
-
-                    get("status") {
-                        call.respond(
-                            DashboardStatusResponse(
-                                isObserving = dbObserver.isPollingThreadAlive,
-                                statusMessage = if (dbObserver.isPollingThreadAlive) {
-                                    "Observing database"
-                                } else {
-                                    "Not observing database"
-                                },
-                                lastLogs = observerHelper.lastChatLogs
-                            )
-                        )
-                    }
-                }
-
-                route("/config") {
-                    get {
-                        call.respond(
-                            ConfigResponse(
-                                bot_name = Configurable.botName,
-                                bot_http_port = Configurable.botSocketPort,
-                                web_server_endpoint = Configurable.webServerEndpoint,
-                                db_polling_rate = Configurable.dbPollingRate,
-                                message_send_rate = Configurable.messageSendRate,
-                                bot_id = Configurable.botId,
-                            )
-                        )
-                    }
-
-                    post("{name}") {
-                        val name = call.parameters["name"]
-                        val req = call.receive<ConfigRequest>()
-
-                        when (name) {
-                            "endpoint" -> {
-                                var value = req.endpoint
-                                if (value == null) {
-                                    value = ""
-                                }
-                                Configurable.webServerEndpoint = value
-                            }
-
-                            "botname" -> {
-                                val value = req.botname
-                                if (value.isNullOrBlank()) {
-                                    throw Exception("missing or empty value")
-                                }
-                                Configurable.botName = value
-                            }
-
-                            "dbrate" -> {
-                                val value = req.rate ?: throw Exception("missing or invalid value")
-
-                                Configurable.dbPollingRate = value
-                            }
-
-                            "sendrate" -> {
-                                val value = req.rate ?: throw Exception("missing or invalid value")
-
-                                Configurable.messageSendRate = value
-                            }
-
-                            "botport" -> {
-                                val value = req.port ?: throw Exception("missing or invalid value")
-
-                                if (value < 1 || value > 65535) {
+@@ -144,79 +153,134 @@ class IrisServer(
                                     throw Exception("Invalid port number. Port must be between 1 and 65535.")
                                 }
 
@@ -166,34 +81,9 @@ class IrisServer(
 
                 post("/reply") {
                     val replyRequest = call.receive<ReplyRequest>()
-                    val roomId = replyRequest.room.toLong()
+                    handleReplyRequest(replyRequest)
 
-                    val sendResult = when (replyRequest.type) {
-                        ReplyType.TEXT -> Replier.sendMessage(
-                            notificationReferer, roomId, replyRequest.data.jsonPrimitive.content,
-                        )
-
-                        ReplyType.IMAGE -> Replier.sendPhoto(
-                            roomId, replyRequest.data.jsonPrimitive.content
-                        )
-
-                        ReplyType.IMAGE_MULTIPLE -> Replier.sendMultiplePhotos(
-                            roomId,
-                            replyRequest.data.jsonArray.map { it.jsonPrimitive.content })
-                    }
-
-                    sendResult
-                        .onSuccess {
-                            call.respond(ApiResponse(success = true, message = "success"))
-                        }
-                        .onFailure { throwable ->
-                            call.respond(
-                                HttpStatusCode.BadGateway,
-                                CommonErrorResponse(
-                                    message = throwable.message ?: "failed to deliver reply"
-                                )
-                            )
-                        }
+                    call.respond(ApiResponse(success = true, message = "success"))
                 }
 
                 post("/query") {
@@ -223,11 +113,80 @@ class IrisServer(
                 }
 
                 webSocket("/ws") {
-                    sharedFlow.collect { msg ->
-                        send(msg)
+                    val sendMutex = Mutex()
+                    val broadcastJob = launch {
+                        sharedFlow.collect { msg ->
+                            sendMutex.withLock {
+                                send(msg)
+                            }
+                        }
+                    }
+
+                    try {
+                        for (frame in incoming) {
+                            if (frame is Frame.Text) {
+                                val payload = frame.readText()
+                                if (payload.isBlank()) {
+                                    continue
+                                }
+
+                                try {
+                                    val replyRequest = Json.decodeFromString<ReplyRequest>(payload)
+                                    handleReplyRequest(replyRequest)
+                                    sendMutex.withLock {
+                                        send(
+                                            Json.encodeToString<ApiResponse<String>>(ApiResponse(
+                                                success = true,
+                                                message = "success",
+                                            ))
+                                        )
+                                    }
+                                } catch (e: SerializationException) {
+                                    println("Failed to parse WebSocket payload as ReplyRequest: ${e.message}")
+                                    sendMutex.withLock {
+                                        send(
+                                            Json.encodeToString<ApiResponse<String>>(ApiResponse(
+                                                success = false,
+                                                message = "Invalid payload",
+                                            ))
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    println("Failed to handle WebSocket reply request: ${e.message}")
+                                    sendMutex.withLock {
+                                        send(
+                                            Json.encodeToString<ApiResponse<String>>(ApiResponse(
+                                                success = false,
+                                                message = e.message ?: "unknown error",
+                                            ))
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } finally {
+                        broadcastJob.cancelAndJoin()
                     }
                 }
             }
         }.start(wait = true)
+    }
+
+    private fun handleReplyRequest(replyRequest: ReplyRequest) {
+        val roomId = replyRequest.room.toLong()
+
+        when (replyRequest.type) {
+            ReplyType.TEXT -> Replier.sendMessage(
+                notificationReferer, roomId, replyRequest.data.jsonPrimitive.content,
+            )
+
+            ReplyType.IMAGE -> Replier.sendPhoto(
+                roomId, replyRequest.data.jsonPrimitive.content
+            )
+
+            ReplyType.IMAGE_MULTIPLE -> Replier.sendMultiplePhotos(
+                roomId,
+                replyRequest.data.jsonArray.map { it.jsonPrimitive.content })
+        }
     }
 }
