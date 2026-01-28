@@ -55,7 +55,7 @@ android.applicationVariants.all {
                     from(file)
                     into(outputPath)
                     rename { fileName ->
-                        fileName.replace(file.name, "Iris.apk")
+                        fileName.replace(file.name, "Iris-${output.name}.apk")
                     }
                 }
             }
