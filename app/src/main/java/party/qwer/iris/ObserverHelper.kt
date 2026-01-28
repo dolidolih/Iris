@@ -11,6 +11,8 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.LinkedList
 import java.util.concurrent.Executors
+import kotlin.collections.set
+
 
 class ObserverHelper(
     private val db: KakaoDB, private val wsBroadcastFlow: MutableSharedFlow<String>
@@ -57,6 +59,14 @@ class ObserverHelper(
                         var attachment = cursor.getString(columnNames.indexOf("attachment"))
                         val messageType = cursor.getString(columnNames.indexOf("type"))
 
+                        var supplement = "{}"
+                        try {
+                            // supplement가 null이면 exception 발생함.
+                            supplement = cursor.getString(columnNames.indexOf("supplement"))
+                            if(supplement.isNotEmpty() && supplement != "{}")
+                                supplement = KakaoDecrypt.decrypt(enc, supplement, userId)
+                        } catch(e: Exception) {}
+
                         try {
                             if (message.isNotEmpty() && message != "{}") message =
                                 KakaoDecrypt.decrypt(enc, message, userId)
@@ -81,14 +91,32 @@ class ObserverHelper(
                         lastLogId = currentLogId
 
                         val raw = mutableMapOf<String, String?>()
+                        val advancedPlainSerialized = mutableMapOf<String, MutableMap<String, Any?>?>()
+
                         for ((idx, columnName) in columnNames.withIndex()) {
                             if (columnName == "message") {
                                 raw[columnName] = message
                             } else if (columnName == "attachment") {
                                 raw[columnName] = attachment
+                                advancedPlainSerialized[columnName] = getStringJsonToMap(attachment)
+                            } else if (columnName == "supplement") {
+                                raw["supplement"] = supplement
+                                advancedPlainSerialized[columnName] = getStringJsonToMap(supplement)
                             } else {
                                 raw[columnName] = cursor.getString(idx)
                             }
+                        }
+
+                        if (
+                            getStringJsonToMap(supplement).getOrDefault("threadId", "") != ""
+                            &&
+                            getStringJsonToMap(attachment).getOrDefault("src_logId", "") == ""
+                            &&
+                            messageType == "1"
+                            ) {
+                            advancedPlainSerialized["attachment"]?.set("src_logId",
+                                getStringJsonToMap(supplement).getOrDefault("threadId", ""))
+                            raw["attachment"] = JSONObject(advancedPlainSerialized.get("attachment")!!).toString()
                         }
 
                         val chatInfo = db.getChatInfo(chatId, userId)
@@ -119,6 +147,21 @@ class ObserverHelper(
     private fun getLastLogIdFromDB(): Long {
         val lastLog = db.logToDict(0)
         return lastLog["_id"]?.toLongOrNull() ?: 0;
+    }
+
+    private fun getStringJsonToMap(data: String?): MutableMap<String, Any?> {
+        if(data == null) return HashMap()
+        val object_ = JSONObject(data)
+        val map: MutableMap<String, Any?> = HashMap()
+
+        val keys: MutableIterator<String> = object_.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val value: Any? = object_.get(key)
+            map[key] = value
+        }
+
+        return map
     }
 
     private fun getNewLogCountFromDB(): Int {
