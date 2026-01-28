@@ -59,7 +59,7 @@ class ObserverHelper(
                         var attachment = cursor.getString(columnNames.indexOf("attachment"))
                         val messageType = cursor.getString(columnNames.indexOf("type"))
 
-                        val threadId: String? = if (cursor.columnNames.indexOf("thread_id") != -1) {
+                        val threadId: String? = if (columnNames.indexOf("thread_id") != -1) {
                             cursor.getString(columnNames.indexOf("thread_id"))
                         } else {
                             null
@@ -115,7 +115,7 @@ class ObserverHelper(
                         }
 
                         if (
-                            threadId == null &&
+                            (threadId == null || threadId.isEmpty()) &&
                             advancedPlainSerialized["supplement"]!!.getOrDefault("threadId", "") != ""
                             &&
                             advancedPlainSerialized["attachment"]!!.getOrDefault("src_logId", "") == ""
@@ -125,12 +125,13 @@ class ObserverHelper(
                             advancedPlainSerialized["attachment"]!!["src_logId"] =
                                 advancedPlainSerialized["supplement"]!!.getOrDefault("threadId", "")
                             advancedPlainSerialized["attachment"]!!["src_isThread"] = true
-                            raw["attachment"] = JSONObject(advancedPlainSerialized["attachment"]!!).toString()
                         } else if(threadId != null && messageType == "1") {
-                            advancedPlainSerialized["attachment"]!!["src_logId"] = threadId.toULong()
+                            advancedPlainSerialized["attachment"]!!["src_logId"] = threadId.toLong()
                             advancedPlainSerialized["attachment"]!!["src_isThread"] = true
-                            raw["attachment"] = JSONObject(advancedPlainSerialized["attachment"]!!).toString()
                         }
+
+
+                        raw["attachment"] = JSONObject(advancedPlainSerialized["attachment"]!!).toString()
 
                         val chatInfo = db.getChatInfo(chatId, userId)
                         val data = JSONObject(
