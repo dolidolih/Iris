@@ -116,6 +116,7 @@ class ObserverHelper(
                             ) {
                             advancedPlainSerialized["attachment"]?.set("src_logId",
                                 getStringJsonToMap(supplement).getOrDefault("threadId", ""))
+                            advancedPlainSerialized["attachment"]?.set("src_isThread", true)
                             raw["attachment"] = JSONObject(advancedPlainSerialized.get("attachment")!!).toString()
                         }
 
