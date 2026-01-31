@@ -263,7 +263,8 @@ EOF
       -v ~/data:/data \
       -p 5555:5555 \
       -p 3000:3000 \
-      redroid/redroid:11.0.0-latest \
+      --restart=always \
+      redroid/redroid:14.0.0-latest \
       ro.product.model=SM-T970 \
       ro.product.brand=Samsung
 
