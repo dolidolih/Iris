@@ -43,114 +43,116 @@ class ObserverHelper(
                     val currentLogId = cursor.getLong(columnNames.indexOf("_id"))
 
                     if (currentLogId > lastLogId) {
-                        val v = JSONObject(cursor.getString(columnNames.indexOf("v")))
-                        val enc = v.getInt("enc")
-                        val origin = v.getString("origin")
-
-                        if (origin == "SYNCMSG" || origin == "MCHATLOGS") {
-                            lastLogId = currentLogId
-                            continue
-                        }
-
-                        val chatId = cursor.getLong(columnNames.indexOf("chat_id"))
-                        val userId = cursor.getLong(columnNames.indexOf("user_id"))
-
-                        var message = cursor.getString(columnNames.indexOf("message"))
-                        var attachment = cursor.getString(columnNames.indexOf("attachment"))
-                        val messageType = cursor.getString(columnNames.indexOf("type"))
-
-                        val threadId: String? = if (columnNames.indexOf("thread_id") != -1) {
-                            cursor.getString(columnNames.indexOf("thread_id"))
-                        } else {
-                            null
-                        }
-
-                        var supplement = "{}"
                         try {
-                            // supplement가 null이면 exception 발생함.
-                            supplement = cursor.getString(columnNames.indexOf("supplement"))
-                            if(supplement.isNotEmpty() && supplement != "{}")
-                                supplement = KakaoDecrypt.decrypt(enc, supplement, userId)
-                        } catch(_: Exception) {}
+                            val v = JSONObject(cursor.getString(columnNames.indexOf("v")))
+                            val enc = v.getInt("enc")
+                            val origin = v.getString("origin")
 
-                        try {
-                            if (message.isNotEmpty() && message != "{}") message =
-                                KakaoDecrypt.decrypt(enc, message, userId)
-                        } catch (e: Exception) {
-                            println("failed to decrypt message: $e")
-                        }
-
-                        try {
-                            if ((message.contains("선물") && messageType == "71") or (attachment == null)) {
-                                attachment = "{}"
-                            } else if (attachment.isNotEmpty() && attachment != "{}") {
-                                attachment =
-                                    KakaoDecrypt.decrypt(enc, attachment, userId)
+                            if (origin == "SYNCMSG" || origin == "MCHATLOGS") {
+                                return@use
                             }
-                        } catch (e: Exception) {
-                            println("failed to decrypt attachment: $e")
-                        }
 
-                        storeDecryptedLog(cursor, message)
+                            val chatId = cursor.getLong(columnNames.indexOf("chat_id"))
+                            val userId = cursor.getLong(columnNames.indexOf("user_id"))
 
-                        // update log id
-                        lastLogId = currentLogId
+                            var message = cursor.getString(columnNames.indexOf("message"))
+                            var attachment = cursor.getString(columnNames.indexOf("attachment"))
+                            val messageType = cursor.getString(columnNames.indexOf("type"))
 
-                        val raw = mutableMapOf<String, String?>()
-                        val advancedPlainSerialized = mutableMapOf<String, MutableMap<String, Any?>?>()
-
-                        for ((idx, columnName) in columnNames.withIndex()) {
-                            if (columnName == "message") {
-                                raw[columnName] = message
-                            } else if (columnName == "attachment") {
-                                raw[columnName] = attachment
-                                advancedPlainSerialized[columnName] = getStringJsonToMap(attachment)
-                                advancedPlainSerialized[columnName]!!["src_isThread"] = false
-                            } else if (columnName == "supplement") {
-                                raw["supplement"] = supplement
-                                advancedPlainSerialized[columnName] = getStringJsonToMap(supplement)
+                            val threadId: String? = if (columnNames.indexOf("thread_id") != -1) {
+                                cursor.getString(columnNames.indexOf("thread_id"))
                             } else {
-                                raw[columnName] = cursor.getString(idx)
+                                null
                             }
-                        }
 
-                        if (
-                            (threadId == null || threadId.isEmpty()) &&
-                            advancedPlainSerialized["supplement"]!!.getOrDefault("threadId", "") != ""
-                            &&
-                            advancedPlainSerialized["attachment"]!!.getOrDefault("src_logId", "") == ""
-                            &&
-                            messageType == "1"
-                            ) {
-                            advancedPlainSerialized["attachment"]!!["src_logId"] =
-                                advancedPlainSerialized["supplement"]!!.getOrDefault("threadId", "")
-                            advancedPlainSerialized["attachment"]!!["src_isThread"] = true
-                        } else if(threadId != null && messageType == "1") {
-                            advancedPlainSerialized["attachment"]!!["src_logId"] = threadId.toLong()
-                            advancedPlainSerialized["attachment"]!!["src_isThread"] = true
-                        }
+                            var supplement = "{}"
+                            try {
+                                // supplement가 null이면 exception 발생함.
+                                supplement = cursor.getString(columnNames.indexOf("supplement"))
+                                if(supplement.isNotEmpty() && supplement != "{}")
+                                    supplement = KakaoDecrypt.decrypt(enc, supplement, userId)
+                            } catch(_: Exception) {}
 
-
-                        raw["attachment"] = JSONObject(advancedPlainSerialized["attachment"]!!).toString()
-
-                        val chatInfo = db.getChatInfo(chatId, userId)
-                        val data = JSONObject(
-                            mapOf(
-                                "msg" to message,
-                                "room" to chatInfo[0],
-                                "sender" to chatInfo[1],
-                                "json" to raw
-                            )
-                        ).toString()
-
-                        runBlocking {
-                            wsBroadcastFlow.emit(data)
-                        }
-
-                        if (Configurable.webServerEndpoint.isNotEmpty()) {
-                            httpRequestExecutor.execute {
-                                sendPostRequest(data)
+                            try {
+                                if (message.isNotEmpty() && message != "{}") message =
+                                    KakaoDecrypt.decrypt(enc, message, userId)
+                            } catch (e: Exception) {
+                                println("failed to decrypt message: $e")
                             }
+
+                            try {
+                                if ((message.contains("선물") && messageType == "71") or (attachment == null)) {
+                                    attachment = "{}"
+                                } else if (attachment.isNotEmpty() && attachment != "{}") {
+                                    attachment =
+                                        KakaoDecrypt.decrypt(enc, attachment, userId)
+                                }
+                            } catch (e: Exception) {
+                                println("failed to decrypt attachment: $e")
+                            }
+
+                            storeDecryptedLog(cursor, message)
+
+                            val raw = mutableMapOf<String, String?>()
+                            val advancedPlainSerialized = mutableMapOf<String, MutableMap<String, Any?>?>()
+
+                            for ((idx, columnName) in columnNames.withIndex()) {
+                                if (columnName == "message") {
+                                    raw[columnName] = message
+                                } else if (columnName == "attachment") {
+                                    raw[columnName] = attachment
+                                    advancedPlainSerialized[columnName] = getStringJsonToMap(attachment)
+                                    advancedPlainSerialized[columnName]!!["src_isThread"] = false
+                                } else if (columnName == "supplement") {
+                                    raw["supplement"] = supplement
+                                    advancedPlainSerialized[columnName] = getStringJsonToMap(supplement)
+                                } else {
+                                    raw[columnName] = cursor.getString(idx)
+                                }
+                            }
+
+                            if (
+                                (threadId == null || threadId.isEmpty()) &&
+                                advancedPlainSerialized["supplement"]!!.getOrDefault("threadId", "") != ""
+                                &&
+                                advancedPlainSerialized["attachment"]!!.getOrDefault("src_logId", "") == ""
+                                &&
+                                messageType == "1"
+                                ) {
+                                advancedPlainSerialized["attachment"]!!["src_logId"] =
+                                    advancedPlainSerialized["supplement"]!!.getOrDefault("threadId", "")
+                                advancedPlainSerialized["attachment"]!!["src_isThread"] = true
+                            } else if(threadId != null && messageType == "1") {
+                                advancedPlainSerialized["attachment"]!!["src_logId"] = threadId.toLong()
+                                advancedPlainSerialized["attachment"]!!["src_isThread"] = true
+                            }
+
+                            raw["attachment"] = JSONObject(advancedPlainSerialized["attachment"]!!).toString()
+
+                            val chatInfo = db.getChatInfo(chatId, userId)
+                            val data = JSONObject(
+                                mapOf(
+                                    "msg" to message,
+                                    "room" to chatInfo[0],
+                                    "sender" to chatInfo[1],
+                                    "json" to raw
+                                )
+                            ).toString()
+
+                            runBlocking {
+                                wsBroadcastFlow.emit(data)
+                            }
+
+                            if (Configurable.webServerEndpoint.isNotEmpty()) {
+                                httpRequestExecutor.execute {
+                                    sendPostRequest(data)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            println("Error processing log $currentLogId: $e")
+                        } finally {
+                            // 파싱 실패해도 lastLogId 반드시 전진 → 무한 재시도 방지
+                            lastLogId = currentLogId
                         }
                     }
                 }
@@ -164,18 +166,16 @@ class ObserverHelper(
     }
 
     private fun getStringJsonToMap(data: String?): MutableMap<String, Any?> {
-        if(data == null) return HashMap()
-        val object_ = JSONObject(data)
-        val map: MutableMap<String, Any?> = HashMap()
-
-        val keys: MutableIterator<String> = object_.keys()
-        while (keys.hasNext()) {
-            val key = keys.next()
-            val value: Any? = object_.get(key)
-            map[key] = value
+        if (data.isNullOrEmpty()) return HashMap()
+        return try {
+            val obj = JSONObject(data)
+            val map: MutableMap<String, Any?> = HashMap()
+            obj.keys().forEach { key -> map[key] = obj.get(key) }
+            map
+        } catch (e: Exception) {
+            println("getStringJsonToMap parse failed: $e")
+            HashMap()
         }
-
-        return map
     }
 
     private fun getNewLogCountFromDB(): Int {
