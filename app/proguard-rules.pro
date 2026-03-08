@@ -22,3 +22,22 @@
 -keep class io.ktor.** { *; }
 -keep class kotlinx.** { *; }
 -keepattributes *Annotation*
+# Netty optional dependencies
+-dontwarn io.netty.**
+-dontwarn org.apache.log4j.**
+-dontwarn org.apache.logging.log4j.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.conscrypt.**
+-dontwarn org.eclipse.jetty.**
+-dontwarn reactor.blockhound.**
+-dontwarn com.sun.nio.file.**
+-dontwarn java.lang.management.**
+
+# Ktor
+-keep class io.ktor.** { *; }
+-dontwarn io.ktor.**
+
+# Kotlin
+-keep class kotlinx.** { *; }
+-keepattributes *Annotation*
+-keepattributes Signature
