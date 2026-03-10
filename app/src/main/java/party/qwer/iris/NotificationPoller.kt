@@ -1,4 +1,3 @@
-//notification parsing logic from https://github.com/mooner1022/StarLight/blob/nightly/app/src/main/java/dev/mooner/starlight/listener/specs/AndroidRParserSpec.kt
 package party.qwer.iris
 
 import android.app.Notification
@@ -82,6 +81,7 @@ class NotificationPoller {
             processedNotifications[key] = postTime
 
             if (senderId.isNotEmpty() && !cachedSenderIds.contains(senderId)) {
+                // Assuming NamesDB is implemented elsewhere
                 NamesDB.saveName(senderId, senderName, room)
                 cachedSenderIds.add(senderId)
             }
@@ -105,25 +105,75 @@ class NotificationPoller {
 
             val methods = inpm.javaClass.methods
 
-            val getAppActiveMethod = methods.find {
-                it.name == "getAppActiveNotifications" && it.parameterTypes.size == 2 && it.parameterTypes[0] == String::class.java
-            }
-            if (getAppActiveMethod != null) {
-                val result = getAppActiveMethod.invoke(inpm, "com.kakao.talk", 0)
-                if (result is Array<*>) return result.filterIsInstance<StatusBarNotification>().toTypedArray()
+            val userId = try {
+                val userHandleClass = Class.forName("android.os.UserHandle")
+                userHandleClass.getMethod("myUserId").invoke(null) as Int
+            } catch (e: Exception) {
+                0
             }
 
-            val getActiveMethod = methods.find {
-                it.name == "getActiveNotifications" && it.parameterTypes.size == 1 && it.parameterTypes[0] == String::class.java
+            try {
+                val getActiveMethod = methods.find {
+                    it.name == "getActiveNotifications" && it.parameterTypes.size == 1 && it.parameterTypes[0] == String::class.java
+                }
+                if (getActiveMethod != null) {
+                    val result = getActiveMethod.invoke(inpm, "com.android.shell")
+                    val notifications = extractNotifications(result)
+                    if (notifications.isNotEmpty()) return notifications
+                }
+            } catch (e: Exception) {
+                // pass
             }
-            if (getActiveMethod != null) {
-                val result = getActiveMethod.invoke(inpm, "com.android.shell")
-                if (result is Array<*>) return result.filterIsInstance<StatusBarNotification>().toTypedArray()
+
+            try {
+                val getAppActiveMethod = methods.find {
+                    it.name == "getAppActiveNotifications" && it.parameterTypes.size == 2 && it.parameterTypes[0] == String::class.java
+                }
+                if (getAppActiveMethod != null) {
+                    val result = getAppActiveMethod.invoke(inpm, "com.kakao.talk", userId)
+                    val notifications = extractNotifications(result)
+                    if (notifications.isNotEmpty()) return notifications
+                }
+            } catch (e: Exception) {
+                // pass
+            }
+
+            try {
+                val getActiveMethod = methods.find {
+                    it.name == "getActiveNotifications" && it.parameterTypes.size == 1 && it.parameterTypes[0] == String::class.java
+                }
+                if (getActiveMethod != null) {
+                    val result = getActiveMethod.invoke(inpm, "com.kakao.talk")
+                    val notifications = extractNotifications(result)
+                    if (notifications.isNotEmpty()) return notifications
+                }
+            } catch (e: Exception) {
+                // pass
             }
 
         } catch (e: Exception) {
             e.printStackTrace()
         }
+        return emptyArray()
+    }
+
+    private fun extractNotifications(result: Any?): Array<StatusBarNotification> {
+        if (result == null) return emptyArray()
+
+        if (result is Array<*>) {
+            return result.filterIsInstance<StatusBarNotification>().toTypedArray()
+        }
+
+        try {
+            val getListMethod = result.javaClass.getMethod("getList")
+            val list = getListMethod.invoke(result) as? List<*>
+            if (list != null) {
+                return list.filterIsInstance<StatusBarNotification>().toTypedArray()
+            }
+        } catch (e: Exception) {
+            // pass
+        }
+
         return emptyArray()
     }
 }
