@@ -2,13 +2,23 @@ package party.qwer.iris
 
 import android.content.ContentValues
 import android.database.sqlite.SQLiteDatabase
+import java.io.File
 
 object NamesDB {
-    private const val DB_PATH = "/data/local/tmp/names.db"
+    private val DB_PATH: String = run {
+        val configPath = System.getenv("IRIS_CONFIG_PATH") ?: "/data/local/tmp/config.json"
+        val configDir = File(configPath).absoluteFile.parent ?: "/data/local/tmp"
+
+        File(configDir, "names.db").absolutePath
+    }
+
     private var db: SQLiteDatabase? = null
 
     init {
         try {
+            val dbFile = File(DB_PATH)
+            dbFile.parentFile?.mkdirs()
+
             db = SQLiteDatabase.openOrCreateDatabase(DB_PATH, null)
             db?.execSQL("CREATE TABLE IF NOT EXISTS names (sender_id TEXT PRIMARY KEY, sender_name TEXT, room_name TEXT)")
         } catch (e: Exception) {
