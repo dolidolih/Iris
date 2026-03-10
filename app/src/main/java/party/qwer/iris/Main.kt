@@ -27,6 +27,10 @@ class Main {
                 dbObserver.startPolling()
                 println("DBObserver started")
 
+                val notificationPoller = NotificationPoller()
+                notificationPoller.startPolling()
+                println("Notification Poller started")
+
                 val imageDeleter = ImageDeleter(IMAGE_DIR_PATH, TimeUnit.HOURS.toMillis(1))
                 imageDeleter.startDeletion()
                 println("ImageDeleter started, and will delete images older than 1 hour.")
