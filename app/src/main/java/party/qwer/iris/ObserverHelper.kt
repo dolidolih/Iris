@@ -9,10 +9,10 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.LinkedList
 import java.util.concurrent.Executors
 import kotlin.collections.set
-
 
 class ObserverHelper(
     private val db: KakaoDB, private val wsBroadcastFlow: MutableSharedFlow<String>
@@ -67,7 +67,6 @@ class ObserverHelper(
 
                         var supplement = "{}"
                         try {
-                            // supplement가 null이면 exception 발생함.
                             supplement = cursor.getString(columnNames.indexOf("supplement"))
                             if(supplement.isNotEmpty() && supplement != "{}")
                                 supplement = KakaoDecrypt.decrypt(enc, supplement, userId)
@@ -93,7 +92,6 @@ class ObserverHelper(
 
                         storeDecryptedLog(cursor, message)
 
-                        // update log id
                         lastLogId = currentLogId
 
                         val raw = mutableMapOf<String, String?>()
@@ -121,7 +119,7 @@ class ObserverHelper(
                             advancedPlainSerialized["attachment"]!!.getOrDefault("src_logId", "") == ""
                             &&
                             messageType == "1"
-                            ) {
+                        ) {
                             advancedPlainSerialized["attachment"]!!["src_logId"] =
                                 advancedPlainSerialized["supplement"]!!.getOrDefault("threadId", "")
                             advancedPlainSerialized["attachment"]!!["src_isThread"] = true
@@ -130,15 +128,35 @@ class ObserverHelper(
                             advancedPlainSerialized["attachment"]!!["src_isThread"] = true
                         }
 
-
                         raw["attachment"] = JSONObject(advancedPlainSerialized["attachment"]!!).toString()
 
                         val chatInfo = db.getChatInfo(chatId, userId)
+                        var roomName = chatInfo[0]
+                        var senderName = chatInfo[1]
+
+                        if (senderName.isNullOrEmpty()) {
+                            try {
+                                val rawKey = "person_${chatId}:${userId}"
+                                val md = MessageDigest.getInstance("SHA-256")
+                                val hashedId = md.digest(rawKey.toByteArray()).joinToString("") { "%02x".format(it) }
+
+                                val fallbackInfo = NamesDB.getName(hashedId)
+                                if (fallbackInfo != null) {
+                                    senderName = fallbackInfo.first
+                                    if (roomName.isNullOrEmpty()) {
+                                        roomName = fallbackInfo.second
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+
                         val data = JSONObject(
                             mapOf(
                                 "msg" to message,
-                                "room" to chatInfo[0],
-                                "sender" to chatInfo[1],
+                                "room" to roomName,
+                                "sender" to senderName,
                                 "json" to raw
                             )
                         ).toString()
@@ -225,17 +243,12 @@ class ObserverHelper(
                     println("HTTP Response Body: $responseBody")
                 } else {
                     System.err.println("HTTP Error Response: $responseCode - ${response.message}")
-                    val errorBody = response.body?.string()
-                    if (errorBody != null) {
-                        System.err.println("Error Body: $errorBody")
-                    }
                 }
             }
         } catch (e: IOException) {
             System.err.println("Error sending POST request: " + e.message)
         }
     }
-
 
     val lastChatLogs: List<Map<String, String?>>
         get() = lastDecryptedLogs
