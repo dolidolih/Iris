@@ -57,12 +57,21 @@ class KakaoDB {
         return connection.rawQuery(sql, stringUserId).use { cursor ->
             if (cursor.moveToNext()) {
                 val encryptedName = cursor.getString(cursor.getColumnIndexOrThrow("name"))
-                val enc = cursor.getInt(cursor.getColumnIndexOrThrow("enc"))
+                if (encryptedName.isNullOrEmpty()) {
+                    return@use null
+                }
+
+                val encColumnIndex = cursor.getColumnIndex("enc")
+                if (encColumnIndex == -1 || cursor.isNull(encColumnIndex)) {
+                    return@use encryptedName
+                }
+
+                val enc = cursor.getInt(encColumnIndex)
 
                 try {
                     KakaoDecrypt.decrypt(enc, encryptedName, Configurable.botId)
                 } catch (e: Exception) {
-                    System.err.println("Decryption error in getNameOfUserId: $e");
+                    System.err.println("Decryption error in getNameOfUserId userId=$userId: $e")
                     encryptedName
                 }
             } else {
