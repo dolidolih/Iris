@@ -9,6 +9,17 @@ import org.json.JSONException
 import org.json.JSONObject
 
 class KakaoDB {
+    data class OpenChatMemberSnapshot(
+        val linkId: Long,
+        val userId: Long,
+        val nicknameRaw: String?,
+        val enc: Int,
+        val profileLinkId: Long?
+    ) {
+        val cacheKey: String
+            get() = "$linkId:$userId"
+    }
+
     lateinit var connection: SQLiteDatabase
 
     init {
@@ -134,6 +145,89 @@ class KakaoDB {
             null
         ).use { cursor ->
             cursor.count > 0
+        }
+    }
+
+    fun getDb2DataVersion(): Long? {
+        return try {
+            connection.rawQuery("PRAGMA db2.data_version", null).use { cursor ->
+                if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                    cursor.getLong(0)
+                } else {
+                    null
+                }
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun getOpenChatMemberSnapshotRaw(): List<OpenChatMemberSnapshot> {
+        if (!checkNewDb()) {
+            return emptyList()
+        }
+
+        return connection.rawQuery(
+            """
+                SELECT
+                    link_id,
+                    user_id,
+                    nickname,
+                    enc,
+                    profile_link_id
+                FROM db2.open_chat_member
+            """.trimIndent(),
+            null
+        ).use { cursor ->
+            val rows = ArrayList<OpenChatMemberSnapshot>(cursor.count.coerceAtLeast(0))
+            val linkIdIndex = cursor.getColumnIndexOrThrow("link_id")
+            val userIdIndex = cursor.getColumnIndexOrThrow("user_id")
+            val nicknameIndex = cursor.getColumnIndexOrThrow("nickname")
+            val encIndex = cursor.getColumnIndexOrThrow("enc")
+            val profileLinkIdIndex = cursor.getColumnIndexOrThrow("profile_link_id")
+
+            while (cursor.moveToNext()) {
+                rows.add(
+                    OpenChatMemberSnapshot(
+                        linkId = cursor.getLong(linkIdIndex),
+                        userId = cursor.getLong(userIdIndex),
+                        nicknameRaw = cursor.getString(nicknameIndex),
+                        enc = cursor.getInt(encIndex),
+                        profileLinkId = if (cursor.isNull(profileLinkIdIndex)) {
+                            null
+                        } else {
+                            cursor.getLong(profileLinkIdIndex)
+                        }
+                    )
+                )
+            }
+
+            rows
+        }
+    }
+
+    fun getOpenLinkRoomNameForLink(linkId: Long): String? {
+        return connection.rawQuery(
+            "SELECT name FROM db2.open_link WHERE id = ? LIMIT 1",
+            arrayOf(linkId.toString())
+        ).use { cursor ->
+            if (cursor.moveToFirst()) {
+                cursor.getString(0)
+            } else {
+                null
+            }
+        }
+    }
+
+    fun decryptOpenChatMemberNickname(nicknameRaw: String?, enc: Int): String? {
+        if (nicknameRaw.isNullOrBlank() || enc <= 0) {
+            return nicknameRaw
+        }
+
+        return try {
+            KakaoDecrypt.decrypt(enc, nicknameRaw, Configurable.botId)
+        } catch (_: Exception) {
+            nicknameRaw
         }
     }
 

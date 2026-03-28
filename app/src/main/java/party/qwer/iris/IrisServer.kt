@@ -25,6 +25,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.jsonObject
+import java.util.LinkedList
 import party.qwer.iris.model.AotResponse
 import party.qwer.iris.model.ApiResponse
 import party.qwer.iris.model.CommonErrorResponse
@@ -33,11 +34,62 @@ import party.qwer.iris.model.ConfigResponse
 import party.qwer.iris.model.DashboardStatusResponse
 import party.qwer.iris.model.DecryptRequest
 import party.qwer.iris.model.DecryptResponse
+import party.qwer.iris.model.NicknameObserverStatusResponse
 import party.qwer.iris.model.QueryRequest
 import party.qwer.iris.model.QueryResponse
 import party.qwer.iris.model.ReplyRequest
 import party.qwer.iris.model.ReplyType
 
+object NicknameObserverRegistry {
+    private const val MAX_EVENTS_STORED = 50
+    private val recentEvents = LinkedList<Map<String, String?>>()
+
+    @Volatile
+    var isObserving: Boolean = false
+        private set
+
+    @Volatile
+    var statusMessage: String = "Nickname observer idle"
+        private set
+
+    fun updateStatus(isObserving: Boolean, statusMessage: String) {
+        this.isObserving = isObserving
+        this.statusMessage = statusMessage
+    }
+
+    fun recordEvent(event: Map<String, String?>) {
+        synchronized(recentEvents) {
+            recentEvents.addFirst(normalizeEvent(event))
+            while (recentEvents.size > MAX_EVENTS_STORED) {
+                recentEvents.removeLast()
+            }
+        }
+    }
+
+    private fun normalizeEvent(event: Map<String, String?>): Map<String, String?> {
+        val normalized = LinkedHashMap(event)
+        val oldNickname = event["old_nickname"] ?: event["old"]
+        val newNickname = event["new_nickname"] ?: event["nickname"] ?: event["new"]
+
+        if (!normalized.containsKey("old_nickname")) {
+            normalized["old_nickname"] = oldNickname
+        }
+        if (!normalized.containsKey("new_nickname")) {
+            normalized["new_nickname"] = newNickname
+        }
+        if (!normalized.containsKey("field") && (oldNickname != null || newNickname != null)) {
+            normalized["field"] = "nickname"
+        }
+
+        return normalized
+    }
+
+    fun snapshotEvents(): List<Map<String, String?>> {
+        synchronized(recentEvents) {
+            return recentEvents.toList()
+        }
+    }
+}
 
 class IrisServer(
     private val kakaoDB: KakaoDB,
@@ -88,6 +140,16 @@ class IrisServer(
                             )
                         )
                     }
+
+                    get("nickname-status") {
+                        call.respond(
+                            NicknameObserverStatusResponse(
+                                isObserving = NicknameObserverRegistry.isObserving,
+                                statusMessage = NicknameObserverRegistry.statusMessage,
+                                recentNicknameEvents = NicknameObserverRegistry.snapshotEvents()
+                            )
+                        )
+                    }
                 }
 
                 route("/config") {
@@ -98,6 +160,7 @@ class IrisServer(
                                 bot_http_port = Configurable.botSocketPort,
                                 web_server_endpoint = Configurable.webServerEndpoint,
                                 db_polling_rate = Configurable.dbPollingRate,
+                                nickname_observer_rate = Configurable.nicknameObserverRate,
                                 message_send_rate = Configurable.messageSendRate,
                                 bot_id = Configurable.botId,
                             )
@@ -135,6 +198,15 @@ class IrisServer(
                                 val value = req.rate ?: throw Exception("missing or invalid value")
 
                                 Configurable.messageSendRate = value
+                            }
+
+                            "nickobserverrate" -> {
+                                val value = req.rate ?: throw Exception("missing or invalid value")
+                                if (value < 0) {
+                                    throw Exception("nickname observer rate must be greater than or equal to 0")
+                                }
+
+                                Configurable.nicknameObserverRate = value
                             }
 
                             "botport" -> {
@@ -198,7 +270,8 @@ class IrisServer(
                     try {
                         val rows = kakaoDB.executeQuery(
                             queryRequest.query,
-                            (queryRequest.bind?.map { it.content } ?: listOf()).toTypedArray())
+                            (queryRequest.bind?.map { it.content } ?: listOf()).toTypedArray()
+                        )
 
                         call.respond(QueryResponse(data = rows.map {
                             KakaoDB.decryptRow(it)

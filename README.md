@@ -198,6 +198,7 @@ Iris는 기본적으로 HTTP 프로토콜을 통해 정보를 주고 받습니�
       "bot_http_port": [PORT_FOR_HTTP_SERVER],
       "web_server_endpoint": "[YOUR_WEB_SERVER_URL_FOR_MESSAGE_FORWARDING],
       "db_polling_rate": [DATABASE_POLLING_INTERVAL_IN_MILLISECONDS],
+      "nickname_observer_rate": [NICKNAME_OBSERVER_INTERVAL_IN_MILLISECONDS],
       "message_send_rate": [MESSAGE_SEND_INTERVAL_IN_MILLISECONDS],
       "bot_id": [YOUR_KAKAO_TALK_USER_ID]
     }
@@ -250,6 +251,21 @@ Iris는 기본적으로 HTTP 프로토콜을 통해 정보를 주고 받습니�
     ```bash
     curl -X POST -H "Content-Type: application/json" -d '{"rate": 200}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/sendrate
     ```
+*   **`/config/nickobserverrate` (POST)**: `db2.open_chat_member` 닉네임 observer 폴링 속도를 업데이트합니다. `0`은 예전 `100ms` fallback으로 되돌아가지 않는 저지연 모드입니다.
+
+    **요청 본문 (JSON):**
+
+    ```json
+    {
+      "rate": [NICKNAME_OBSERVER_INTERVAL_IN_MILLISECONDS]
+    }
+    ```
+
+    **예시:**
+
+    ```bash
+    curl -X POST -H "Content-Type: application/json" -d '{"rate": 0}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/nickobserverrate
+    ```
 *   **`/config/botport` (POST)**: 봇 HTTP 서버 포트를 업데이트합니다. **참고**: 이 변경 사항은 적용하려면 Iris를 재시작해야 합니다.
 
     **요청 본문 (JSON):**
@@ -269,6 +285,11 @@ Iris는 기본적으로 HTTP 프로토콜을 통해 정보를 주고 받습니�
 #### WebSocket 엔드포인트
 
 *   **`/ws`**: WebSocket 연결을 생성합니다.
+
+#### Dashboard status endpoints
+
+*   **`/dashboard/status` (GET)**: 기존 DB observer 상태와 최근 채팅 로그를 반환합니다.
+*   **`/dashboard/nickname-status` (GET)**: db2 nickname observer 상태와 최근 닉네임 변경 목록을 반환합니다.
 
 ##### 메시지 전달을 위한 API 레퍼런스
 

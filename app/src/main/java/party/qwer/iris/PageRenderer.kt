@@ -8,6 +8,7 @@ class PageRenderer {
             html = html.replace("CURRENT_WEB_ENDPOINT", Configurable.webServerEndpoint)
             html = html.replace("CURRENT_BOT_NAME", Configurable.botName)
             html = html.replace("CURRENT_DB_RATE", Configurable.dbPollingRate.toString())
+            html = html.replace("CURRENT_NICKNAME_OBSERVER_RATE", Configurable.nicknameObserverRate.toString())
             html = html.replace("CURRENT_SEND_RATE", Configurable.messageSendRate.toString())
             html = html.replace("CURRENT_BOT_PORT", Configurable.botSocketPort.toString())
             return html

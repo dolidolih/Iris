@@ -377,6 +377,10 @@
             overflow: hidden;
         }
 
+        .status-section + .status-section {
+            margin-top: 2rem;
+        }
+
         .status-section::before {
             content: '';
             position: absolute;
@@ -719,6 +723,28 @@
                 </div>
 
                 <div class="config-item">
+                    <h3><i class="fas fa-wave-square"></i> Nickname Observer Rate</h3>
+                    <div class="form-group">
+                        <label for="nicknameObserverRate">Current Rate (ms)</label>
+                        <input type="number" id="nicknameObserverRate" value="CURRENT_NICKNAME_OBSERVER_RATE" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="newNicknameObserverRate">New Rate (ms)</label>
+                        <div class="input-buttons-group">
+                            <input type="number" id="newNicknameObserverRate" min="0" step="1" placeholder="0">
+                            <button class="btn btn-primary"
+                                    onclick="updateConfig('nickobserverrate', document.getElementById('newNicknameObserverRate').value)">
+                                Update
+                            </button>
+                        </div>
+                    </div>
+                    <div class="notice">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        A value of 0 keeps low-latency mode enabled instead of reverting to the old 100ms fallback.
+                    </div>
+                </div>
+
+                <div class="config-item">
                     <h3><i class="fas fa-paper-plane"></i> Message Send Rate</h3>
                     <div class="form-group">
                         <label for="messageSendRate">Current Rate (ms)</label>
@@ -846,12 +872,24 @@
         <h3><i class="fas fa-history"></i> Recent Chat Logs</h3>
         <div id="lastLogs"></div>
     </div>
+
+    <div class="status-section">
+        <div class="status-header">
+            <h2><i class="fas fa-signature"></i> Recent Nickname Changes</h2>
+        </div>
+        <div class="status-header">
+            <p class="status-text" id="nicknameStatusText">Checking nickname observer...</p>
+        </div>
+        <div id="nicknameEvents"></div>
+    </div>
 </div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         fetchDbStatus();
+        fetchNicknameStatus();
         setInterval(fetchDbStatus, 5000);
+        setInterval(fetchNicknameStatus, 1000);
         updateReplyDataPlaceholder();
     });
 
@@ -867,7 +905,15 @@
         return `${year}:${month}:${day} ${hours}:${minutes}:${seconds}`;
     };
 
+    let isFetchingDbStatus = false;
+    let isFetchingNicknameStatus = false;
+
     function fetchDbStatus() {
+        if (isFetchingDbStatus) {
+            return;
+        }
+
+        isFetchingDbStatus = true;
         fetch('/dashboard/status')
             .then(response => response.json())
             .then(data => {
@@ -921,6 +967,69 @@
                 dbStatusElement.textContent = 'Error checking DB status';
                 dbStatusElement.className = 'status-text bad';
                 statusIndicator.className = 'status-indicator status-bad';
+            })
+            .finally(() => {
+                isFetchingDbStatus = false;
+            });
+    }
+
+    function fetchNicknameStatus() {
+        if (isFetchingNicknameStatus) {
+            return;
+        }
+
+        isFetchingNicknameStatus = true;
+        fetch('/dashboard/nickname-status')
+            .then(response => response.json())
+            .then(data => {
+                const nicknameStatusText = document.getElementById('nicknameStatusText');
+                const nicknameEventsContainer = document.getElementById('nicknameEvents');
+                nicknameStatusText.textContent = data.statusMessage || 'Unknown nickname observer status';
+                nicknameStatusText.className = `status-text ${data.isObserving ? 'good' : 'bad'}`;
+                nicknameEventsContainer.innerHTML = '';
+
+                if (data.recentNicknameEvents && data.recentNicknameEvents.length > 0) {
+                    const table = document.createElement('table');
+                    table.className = 'log-table';
+                    const headerRow = table.insertRow();
+                    const headers = ['Time', 'Room', 'User ID', 'Old Nickname', 'New Nickname'];
+                    headers.forEach(headerText => {
+                        const th = document.createElement('th');
+                        th.textContent = headerText;
+                        headerRow.appendChild(th);
+                    });
+
+                    data.recentNicknameEvents.forEach(event => {
+                        const row = table.insertRow();
+                        const values = [
+                            formatUnixTimestamp(event.ts || 0),
+                            event.room_name || '',
+                            event.user_id || '',
+                            event.old_nickname || '',
+                            event.new_nickname || ''
+                        ];
+
+                        values.forEach(value => {
+                            const cell = row.insertCell();
+                            cell.textContent = value;
+                        });
+                    });
+
+                    nicknameEventsContainer.appendChild(table);
+                } else {
+                    nicknameEventsContainer.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">No nickname change events yet.</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching nickname observer status:', error);
+                const nicknameStatusText = document.getElementById('nicknameStatusText');
+                const nicknameEventsContainer = document.getElementById('nicknameEvents');
+                nicknameStatusText.textContent = 'Error checking nickname observer';
+                nicknameStatusText.className = 'status-text bad';
+                nicknameEventsContainer.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Failed to load nickname events.</p>';
+            })
+            .finally(() => {
+                isFetchingNicknameStatus = false;
             });
     }
 
@@ -1012,11 +1121,26 @@
     function updateConfig(type, value) {
         let url = '/config/' + type;
         let postData = {};
+        if (type === 'nickobserverrate') {
+            if (value === '') {
+                alert('Please enter a nickname observer rate.');
+                return;
+            }
+
+            const numericValue = Number(value);
+            if (!Number.isFinite(numericValue) || !Number.isInteger(numericValue) || numericValue < 0) {
+                alert('Nickname observer rate must be a whole number that is 0 or greater.');
+                return;
+            }
+
+            value = numericValue.toString();
+        }
+
         if (type === 'endpoint') {
             postData = { endpoint: value };
         } else if (type === 'botname') {
             postData = { botname: value };
-        } else if (type === 'dbrate' || type === 'sendrate') {
+        } else if (type === 'dbrate' || type === 'sendrate' || type === 'nickobserverrate') {
             postData = { rate: value };
         } else if (type === 'botport') {
             postData = { port: value };

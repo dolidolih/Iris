@@ -8,6 +8,7 @@ data class ConfigResponse(
     val bot_http_port: Int,
     val web_server_endpoint: String,
     val db_polling_rate: Long,
+    val nickname_observer_rate: Long,
     val message_send_rate: Long,
     val bot_id: Long,
 )

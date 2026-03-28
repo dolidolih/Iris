@@ -27,6 +27,10 @@ class Main {
                 dbObserver.startPolling()
                 println("DBObserver started")
 
+                val db2NicknameObserver = Db2NicknameObserver(kakaoDb)
+                db2NicknameObserver.startPolling()
+                println("DB2 nickname observer started")
+
                 val notificationPoller = NotificationPoller()
                 notificationPoller.startPolling()
                 println("Notification Poller started")
@@ -36,7 +40,11 @@ class Main {
                 println("ImageDeleter started, and will delete images older than 1 hour.")
 
                 val irisServer = IrisServer(
-                    kakaoDb, dbObserver, observerHelper, notificationReferer, wsEventFlow
+                    kakaoDb,
+                    dbObserver,
+                    observerHelper,
+                    notificationReferer,
+                    wsEventFlow
                 )
                 irisServer.startServer()
                 println("Iris Server started")

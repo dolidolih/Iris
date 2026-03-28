@@ -34,11 +34,20 @@ class Configurable {
                 val jsonString = configFile.readText()
                 println("jsonString from file: $jsonString")
                 configValues = json.decodeFromString(ConfigValues.serializer(), jsonString)
+                sanitizeConfigValues()
             } catch (e: IOException) {
                 println("Error reading config.json from $CONFIG_FILE_PATH, creating default config: ${e.message}")
                 saveConfig()
             } catch (e: SerializationException) {
                 System.err.println("JSON parsing error in config.json from $CONFIG_FILE_PATH, creating default config: ${e.message}")
+                saveConfig()
+            }
+        }
+
+        private fun sanitizeConfigValues() {
+            if (configValues.nicknameObserverRate < 0) {
+                println("NicknameObserverRate was negative in config, normalizing to 0.")
+                configValues.nicknameObserverRate = 0
                 saveConfig()
             }
         }
@@ -96,6 +105,14 @@ class Configurable {
                 configValues.dbPollingRate = value
                 saveConfig()
                 println("DbPollingRate updated to: $dbPollingRate")
+            }
+
+        var nicknameObserverRate: Long
+            get() = configValues.nicknameObserverRate
+            set(value) {
+                configValues.nicknameObserverRate = value.coerceAtLeast(0)
+                saveConfig()
+                println("NicknameObserverRate updated to: $nicknameObserverRate")
             }
 
         var messageSendRate: Long
