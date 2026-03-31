@@ -992,7 +992,7 @@
                     const table = document.createElement('table');
                     table.className = 'log-table';
                     const headerRow = table.insertRow();
-                    const headers = ['Time', 'Room', 'User ID', 'Old Nickname', 'New Nickname'];
+                    const headers = ['Time', 'Room', 'Chat ID', 'User ID', 'Old Nickname', 'New Nickname'];
                     headers.forEach(headerText => {
                         const th = document.createElement('th');
                         th.textContent = headerText;
@@ -1004,6 +1004,7 @@
                         const values = [
                             formatUnixTimestamp(event.ts || 0),
                             event.room_name || '',
+                            event.chat_id || '',
                             event.user_id || '',
                             event.old_nickname || '',
                             event.new_nickname || ''

@@ -19,6 +19,7 @@ class Db2NicknameObserver(
 
     private var lastSnapshot: Map<String, CacheEntry> = emptyMap()
     private val roomNameCache: MutableMap<Long, String?> = HashMap()
+    private val chatIdCache: MutableMap<Long, Long?> = HashMap()
     private var lastDataVersion: Long? = null
     private var hasBaseline = false
     private var activePollingRateMs: Long = currentConfiguredRate()
@@ -185,6 +186,7 @@ class Db2NicknameObserver(
         newNickname: String?
     ) {
         val roomName = resolveRoomName(currentEntry.linkId)
+        val chatId = resolveChatId(currentEntry.linkId)
         val ts = System.currentTimeMillis() / 1000
 
         val eventMap = linkedMapOf(
@@ -192,6 +194,7 @@ class Db2NicknameObserver(
             "type" to "open_chat_member.updated",
             "source" to "db2.open_chat_member",
             "room_name" to roomName,
+            "chat_id" to chatId?.toString(),
             "link_id" to currentEntry.linkId.toString(),
             "user_id" to currentEntry.userId.toString(),
             "field" to "nickname",
@@ -209,6 +212,14 @@ class Db2NicknameObserver(
             roomNameCache[linkId] = freshRoomName
         }
         return roomNameCache[linkId]
+    }
+
+    private fun resolveChatId(linkId: Long): Long? {
+        val freshChatId = kakaoDb.getChatIdForLink(linkId)
+        if (freshChatId != null || !chatIdCache.containsKey(linkId)) {
+            chatIdCache[linkId] = freshChatId
+        }
+        return chatIdCache[linkId]
     }
 
     private fun observationMode(currentDataVersion: Long?): String {

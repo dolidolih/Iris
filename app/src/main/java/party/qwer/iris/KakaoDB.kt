@@ -219,6 +219,19 @@ class KakaoDB {
         }
     }
 
+    fun getChatIdForLink(linkId: Long): Long? {
+        return connection.rawQuery(
+            "SELECT id FROM chat_rooms WHERE link_id = ? LIMIT 1",
+            arrayOf(linkId.toString())
+        ).use { cursor ->
+            if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                cursor.getLong(0)
+            } else {
+                null
+            }
+        }
+    }
+
     fun decryptOpenChatMemberNickname(nicknameRaw: String?, enc: Int): String? {
         if (nicknameRaw.isNullOrBlank() || enc <= 0) {
             return nicknameRaw
