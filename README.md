@@ -49,7 +49,7 @@ Iris는 기본적으로 HTTP 프로토콜을 통해 정보를 주고 받습니�
 
 모든 요청은 별도로 명시되지 않는 한 `Content-Type: application/json`과 함께 `POST` 요청으로 보내야 합니다.
 
-*   **`/reply`**: 카카오톡 채팅방에 메시지 또는 사진을 보냅니다.
+*   **`/reply`**: 카카오톡 채팅방에 메시지, 사진 또는 파일을 보냅니다.
 
     **요청 본문 (JSON):**
 
@@ -74,6 +74,14 @@ Iris는 기본적으로 HTTP 프로토콜을 통해 정보를 주고 받습니�
     ```bash
     curl -X POST -H "Content-Type: application/json" -d '{"type": "image", "room": "1234567890", "data": "[BASE64_ENCODED_IMAGE_DATA]"}' http://[YOUR_DEVICE_IP]:[bot_http_port]/reply
     curl -X POST -H "Content-Type: application/json" -d '{"type": "image_multiple", "room": "1234567890", "data": [BASE64_ENCODED_IMAGE_DATA1,BASE64_ENCODED_IMAGE_DATA2,BASE64_ENCODED_IMAGE_DATA3]}' http://[YOUR_DEVICE_IP]:[bot_http_port]/reply
+    ```
+
+    **예시 (동영상, 파일 메시지):** 파일은 `filename` 파라미터와 함께 바이너리 스트림으로 전송합니다. mp4 형식의 동영상을 보내기 위해서는 `video/mp4`, 일반 파일로 전달하려면 `application/octet-stream`을 `Content-Type`으로 지정합니다.
+
+    ```bash
+    curl -X POST -H "Content-Type: video/mp4" --data-binary @video.mp4 "http://[YOUR_DEVICE_IP]:[bot_http_port]/reply?room=[CHAT_ROOM_ID]&filename=video.mp4"
+    curl -X POST -H "Content-Type: application/octet-stream" --data-binary @document.pdf "http://[YOUR_DEVICE_IP]:[bot_http_port]/reply?room=[CHAT_ROOM_ID]&filename=document.pdf"
+    curl -X POST -H "Content-Type: application/octet-stream" --data-binary @archive.zip "http://[YOUR_DEVICE_IP]:[bot_http_port]/reply?room=[CHAT_ROOM_ID]&filename=archive.zip"
     ```
 
 *   **`/query`**: 카카오톡 데이터베이스에 SQL 쿼리를 실행합니다. 이 메소드는 응답에서 암호화된 데이터 필드를 자동으로 복호화합니다.

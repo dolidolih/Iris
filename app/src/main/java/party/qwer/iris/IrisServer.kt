@@ -1,6 +1,7 @@
 package party.qwer.iris
 
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.serialization.kotlinx.json.json
@@ -10,6 +11,7 @@ import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveChannel
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
@@ -168,6 +170,64 @@ class IrisServer(
                 }
 
                 post("/reply") {
+                    val mediaType = call.request.headers[HttpHeaders.ContentType]
+                        ?.substringBefore(';')
+                        ?.trim()
+                        ?.lowercase()
+                    val fileName = call.request.queryParameters["filename"]
+                    if (fileName != null) {
+                        val roomId = call.request.queryParameters["room"]?.toLongOrNull()
+                        if (roomId == null) {
+                            call.respond(
+                                HttpStatusCode.BadRequest,
+                                CommonErrorResponse(message = "missing or invalid room query parameter")
+                            )
+                            return@post
+                        }
+
+                        when (
+                            Replier.receiveAndSendFile(
+                                room = roomId,
+                                fileName = fileName,
+                                mediaType = mediaType?.takeIf { it.isNotBlank() }
+                                    ?: "application/octet-stream",
+                                declaredSize = call.request.headers[HttpHeaders.ContentLength]
+                                    ?.toLongOrNull(),
+                                channel = call.receiveChannel(),
+                            )
+                        ) {
+                            Replier.FileSendResult.SUCCESS -> call.respond(
+                                ApiResponse(success = true, message = "success")
+                            )
+
+                            Replier.FileSendResult.EMPTY -> call.respond(
+                                HttpStatusCode.BadRequest,
+                                CommonErrorResponse(message = "file body is empty")
+                            )
+
+                            Replier.FileSendResult.TOO_LARGE -> call.respond(
+                                HttpStatusCode.PayloadTooLarge,
+                                CommonErrorResponse(message = "file exceeds the 300 MiB limit")
+                            )
+
+                            Replier.FileSendResult.INVALID_FILE_NAME -> call.respond(
+                                HttpStatusCode.BadRequest,
+                                CommonErrorResponse(message = "filename is invalid")
+                            )
+
+                        }
+                        return@post
+                    }
+                    if (mediaType != "application/json") {
+                        call.respond(
+                            HttpStatusCode.UnsupportedMediaType,
+                            CommonErrorResponse(
+                                message = "binary file uploads require a filename query parameter"
+                            )
+                        )
+                        return@post
+                    }
+
                     val replyRequest = call.receive<ReplyRequest>()
                     val roomId = replyRequest.room.toLong()
                     val threadId = replyRequest.threadId?.toLong()
