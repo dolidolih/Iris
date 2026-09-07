@@ -6,6 +6,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Base64
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.readAvailable
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -17,15 +20,29 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import party.qwer.iris.Replier.Companion.SendMessageRequest
 import java.io.File
+import java.util.UUID
 
 // SendMsg : ye-seola/go-kdb
 
 class Replier {
+    enum class FileSendResult {
+        SUCCESS,
+        EMPTY,
+        TOO_LARGE,
+        INVALID_FILE_NAME,
+    }
+
     companion object {
-        private val messageChannel = Channel<SendMessageRequest>(Channel.CONFLATED)
+        private const val MAX_FILE_SIZE_BYTES = 300L * 1024 * 1024
+        private const val FILE_STREAM_BUFFER_SIZE = 64 * 1024
+
+        private class FileTooLargeException : Exception()
+
+        private val messageChannel = Channel<SendMessageRequest>(Channel.BUFFERED)
         private val coroutineScope = CoroutineScope(Dispatchers.IO)
         private var messageSenderJob: Job? = null
         private val mutex = Mutex()
+        private val fileNameLock = Any()
 
         init {
             startMessageSender()
@@ -117,6 +134,117 @@ class Replier {
             }
         }
 
+        suspend fun receiveAndSendFile(
+            room: Long,
+            fileName: String,
+            mediaType: String,
+            declaredSize: Long?,
+            channel: ByteReadChannel,
+        ): FileSendResult {
+            val safeFileName = sanitizeFileName(fileName)
+                ?: return FileSendResult.INVALID_FILE_NAME
+            if (declaredSize != null && declaredSize > MAX_FILE_SIZE_BYTES) {
+                return FileSendResult.TOO_LARGE
+            }
+
+            val mediaDir = File(IMAGE_DIR_PATH).apply {
+                if (!exists() && !mkdirs()) {
+                    throw Exception("failed to create media directory")
+                }
+            }
+            if (!mediaDir.isDirectory) {
+                throw Exception("media path is not a directory")
+            }
+
+            val uploadId = UUID.randomUUID().toString()
+            val partialFile = File(mediaDir, "$uploadId.part")
+            var completedFile: File? = null
+            var keepCompletedFile = false
+
+            try {
+                var bytesReceived = 0L
+                partialFile.outputStream().use { output ->
+                    val buffer = ByteArray(FILE_STREAM_BUFFER_SIZE)
+                    while (true) {
+                        val bytesRead = channel.readAvailable(buffer, 0, buffer.size)
+                        if (bytesRead == -1) break
+                        if (bytesRead == 0) continue
+                        if (bytesReceived + bytesRead > MAX_FILE_SIZE_BYTES) {
+                            throw FileTooLargeException()
+                        }
+
+                        output.write(buffer, 0, bytesRead)
+                        bytesReceived += bytesRead
+                    }
+                }
+
+                if (bytesReceived == 0L) {
+                    return FileSendResult.EMPTY
+                }
+                val finalizedFile = synchronized(fileNameLock) {
+                    val destination = createUniqueFile(mediaDir, safeFileName)
+                    if (!partialFile.renameTo(destination)) {
+                        throw Exception("failed to finalize uploaded file")
+                    }
+                    destination
+                }
+                completedFile = finalizedFile
+
+                sendFile(room, finalizedFile, mediaType)
+                keepCompletedFile = true
+                return FileSendResult.SUCCESS
+            } catch (_: FileTooLargeException) {
+                return FileSendResult.TOO_LARGE
+            } finally {
+                partialFile.delete()
+                if (!keepCompletedFile) {
+                    completedFile?.delete()
+                }
+            }
+        }
+
+        private suspend fun sendFile(room: Long, file: File, mediaType: String) {
+            val result = CompletableDeferred<Unit>()
+            messageChannel.send(SendMessageRequest {
+                try {
+                    sendFileInternal(room, file, mediaType)
+                    result.complete(Unit)
+                } catch (cause: Throwable) {
+                    result.completeExceptionally(cause)
+                    throw cause
+                }
+            })
+            result.await()
+        }
+
+        private fun sanitizeFileName(fileName: String): String? {
+            val safeFileName = fileName.replace('\\', '/').substringAfterLast('/').trim()
+            if (safeFileName.isBlank() || safeFileName == "." || safeFileName == "..") {
+                return null
+            }
+            if (safeFileName.any { it.code < 32 } ||
+                safeFileName.toByteArray(Charsets.UTF_8).size > 240
+            ) {
+                return null
+            }
+            return safeFileName
+        }
+
+        private fun createUniqueFile(directory: File, fileName: String): File {
+            val original = File(directory, fileName)
+            if (!original.exists()) return original
+
+            val extensionStart = fileName.lastIndexOf('.').takeIf { it > 0 } ?: fileName.length
+            val baseName = fileName.substring(0, extensionStart)
+            val extension = fileName.substring(extensionStart)
+            var suffix = 1
+            while (true) {
+                val candidate = File(directory, "$baseName ($suffix)$extension")
+                if (!candidate.exists()) return candidate
+                suffix++
+            }
+        }
+
         private fun sendPhotoInternal(room: Long, base64ImageDataString: String) {
             sendMultiplePhotosInternal(room, listOf(base64ImageDataString))
         }
@@ -160,6 +288,32 @@ class Replier {
                 AndroidHiddenApi.startActivity(intent)
             } catch (e: Exception) {
                 System.err.println("Error starting activity for sending multiple photos: $e")
+                throw e
+            }
+        }
+
+        private fun sendFileInternal(room: Long, file: File, mediaType: String) {
+            val fileUri = Uri.fromFile(file)
+            mediaScan(fileUri)
+
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                setPackage("com.kakao.talk")
+                type = mediaType
+                putExtra(Intent.EXTRA_STREAM, fileUri)
+                putExtra("key_id", room)
+                putExtra("key_type", 1)
+                putExtra("key_from_direct_share", true)
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+
+            try {
+                AndroidHiddenApi.startActivity(intent)
+            } catch (e: Exception) {
+                System.err.println("Error starting activity for sending file: $e")
                 throw e
             }
         }

@@ -259,6 +259,7 @@
 
         input[type='text'],
         input[type='number'],
+        input[type='file'],
         textarea,
         select {
             width: 100%;
@@ -275,6 +276,7 @@
 
         input[type='text']:focus,
         input[type='number']:focus,
+        input[type='file']:focus,
         textarea:focus,
         select:focus {
             outline: none;
@@ -779,16 +781,23 @@
                             <option value="text">Text</option>
                             <option value="image">Image (Base64)</option>
                             <option value="image_multiple">Multiple Images (Base64 JSON Array)</option>
+                            <option value="video">Video (MP4)</option>
+                            <option value="file">File (Generic Binary)</option>
                         </select>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" id="replyDataGroup">
                         <label for="replyData">Message Data</label>
                         <textarea id="replyData" name="data" rows="4" required
                                   placeholder="Enter message text"></textarea>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" id="replyFileGroup" style="display: none;">
+                        <label for="replyFile">File</label>
+                        <input type="file" id="replyFile">
+                    </div>
+
+                    <div class="form-group" id="replyRawJsonGroup">
                         <label for="replyRawJson">Raw JSON Body (override above)</label>
                         <textarea id="replyRawJson" name="rawJson" rows="4"
                                   placeholder='{"room": "", "type": "text", "data": ""}'></textarea>
@@ -933,6 +942,47 @@
             responseArea.textContent = 'Sending request...';
         }
 
+        if (endpoint === '/reply' && form) {
+            const replyType = form.querySelector('[name="type"]');
+            if (replyType && (replyType.value === 'video' || replyType.value === 'file')) {
+                const room = form.querySelector('[name="room"]').value.trim();
+                const file = document.getElementById('replyFile').files[0];
+                if (!room) {
+                    responseArea.textContent = 'Room ID is required.';
+                    return;
+                }
+                if (!file) {
+                    responseArea.textContent = 'Select a file.';
+                    return;
+                }
+                if (file.size > 300 * 1024 * 1024) {
+                    responseArea.textContent = 'File exceeds the 300 MiB limit.';
+                    return;
+                }
+
+                fetch(
+                    '/reply?room=' + encodeURIComponent(room) +
+                    '&filename=' + encodeURIComponent(file.name),
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': replyType.value === 'video'
+                                ? 'video/mp4'
+                                : 'application/octet-stream'
+                        },
+                        body: file
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        responseArea.textContent = JSON.stringify(data, null, 2);
+                    })
+                    .catch(error => {
+                        responseArea.textContent = 'Error: ' + error.message;
+                    });
+                return;
+            }
+        }
+
         let formData = {};
         if (postDataOverride) {
             formData = postDataOverride;
@@ -1027,6 +1077,21 @@
     function updateReplyDataPlaceholder() {
         const replyType = document.getElementById('replyType');
         const replyDataTextarea = document.getElementById('replyData');
+        const replyDataGroup = document.getElementById('replyDataGroup');
+        const replyFileGroup = document.getElementById('replyFileGroup');
+        const replyFileInput = document.getElementById('replyFile');
+        const replyRawJsonGroup = document.getElementById('replyRawJsonGroup');
+        const isFile = replyType.value === 'video' || replyType.value === 'file';
+
+        replyDataGroup.style.display = isFile ? 'none' : 'block';
+        replyDataTextarea.required = !isFile;
+        replyFileGroup.style.display = isFile ? 'block' : 'none';
+        replyFileInput.required = isFile;
+        replyRawJsonGroup.style.display = isFile ? 'none' : 'block';
+
+        if (isFile) {
+            return;
+        }
         if (replyType.value === 'image') {
             replyDataTextarea.placeholder = 'Enter base64 encoded image data';
         } else if (replyType.value === 'image_multiple') {
