@@ -226,23 +226,33 @@ KakaoTalk 는 이제 `crypto_database`(메시지 전문 검색 인덱스)와 `cr
 * 라이브는 `libsqlcipher.so` 를 APK 에서 추출해 `/data/local/tmp/Iris.work/native/` 에 놓고 `System.load` 합니다. `app_process` 로 띄운 프로세스는 `nativeLibraryDir` 를 만들지 못하므로 `System.loadLibrary("sqlcipher")` 가 다른 앱의 라이브러리를 집어올 수 있는데, 이 경우 `/process-status` 의 `sqlcipher.foreign` 이 `true` 로 찍히고 키 오류와 구별이 불가능해집니다(그래서 `source` 필드로 출처를 먼저 나타냅니다).
 * 원문 DB 는 절대 열지 않고 `/data/local/tmp/Iris.work/` 에 owner-only 사본을 만들어 `PRAGMA query_only` 로 읽습니다. 키 풀 실패는 조용히 무시되고 관련 엔드포인트는 빈 결과를 반환합니다.
 
-*   **`/config/types` (POST)**: `/ws`·webhook 으로 내보낼 메시지 타입 필터. `types` 가 `null` 이면 기존 동작(type `1`/`2` + `attachment` 있는 case)을 유지하고, 배열을 주면 그 타입만 내보냅니다. `include_system_events` 는 type `5` 처럼 내용이 비어 있는 시스템 이벤트까지 포함할지 결정합니다.
+*   **`/config/types` (POST)**: `/ws`·webhook 으로 내보낼 이벤트 필터. `types` 는 숫자가 아니라 **분류 문자열 배열**이다 (`KakaoMessageType.VALID_FILTERS` 가 검증하고, 하나라도 걸리면 500 으로 통째 거부). 빈 배열 `[]` 을 보내면 필터 해제(`null` = 기본 동작).
+
+    허용 값:
+    `text` `photo` `video` `audio` `file` `contact` `photo_animation` `gif` `emoticon` `list` `app` `app_feed` `feed` `feed_share` `talk_memo` `long_app` `current_user` `mchatlog` `syncmsg` `system` `unknown` `deleted`
 
     ```json
-    { "types": [1, 2, 12], "include_system_events": false }
+    { "types": ["text", "photo"] }
     ```
 
     ```bash
-    curl -X POST -H "Content-Type: application/json" -d '{"types":[1],"include_system_events":false}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/types
+    curl -X POST -H "Content-Type: application/json" -d '{"types":["text","photo"]}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/types
+    curl -X POST -H "Content-Type: application/json" -d '{"types":[]}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/types   # 필터 해제
     ```
 
-*   **`/config/extension` (POST)**: 프레임의 `extension` 필드(`attachment` JSON + 타입 분류) 포함 여부. 기본 `false`. 이 플래그는 `/ws` 와 webhook 에 **동일하게** 적용됩니다 — 켜면 webhook 페이로드에도 `extension` 키가 추가되므로, 수신측 파서가 strict 하면 미리 확인하고 켜야 합니다.
+    `types` 에 `"system"`/`"mchatlog"`/`"deleted"` 를 명시하지 않으면 그 계열은 조용히 빠진다 — 필터를 켰는데 특정 이벤트가 안 온다면 이게 원인인 경우가 많다.
+
+*   **`/config/systemevents` (POST)**: `include_system_events` 토글. `origin` 이 `MSG`/`MCHATLOGS`/`SYNCMSG`/`WRITE` 가 아닌 로그(멤버 참가·퇴장, 피드 등)와 삭제 마크 계열을 내보낼지 결정한다. 기본 `true`.
 
     ```json
     { "enable": true }
     ```
 
-*   **`/config/systemevents` (POST)**: `include_system_events` 토글만 (`{"enable": true}`).
+    ```bash
+    curl -X POST -H "Content-Type: application/json" -d '{"enable":false}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/systemevents
+    ```
+
+*   **`/config/extension` (POST)**: 프레임의 `extension` 필드(`attachment` JSON + 타입 분류) 포함 여부. 기본 `false`. 이 플래그는 `/ws` 와 webhook 에 **동일하게** 적용됩니다 — 켜면 webhook 페이로드에도 `extension` 키가 추가되므로, 수신측 파서가 strict 하면 미리 확인하고 켜야 합니다.
 
 #### 설정 API 엔드포인트
 
