@@ -14,6 +14,13 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        // SQLCipher 네이티브 라이브러리(sqlcipher-android) 의 ABI 는 이 기기/에뮬레이터
+        // 계열만 싣는다 — arm64(실기기) 와 x86_64(redroid/emu). APK 를 /data/local/tmp 에
+        // push 해서 app_process 로 돌리기 때문에, 설치 시 native lib 추출 없이
+        // APK 안에서 직접 lib/<abi>/libsqlcipher.so 를 뽑아낸다 (SqlCipherNative).
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     buildTypes {
@@ -73,4 +80,10 @@ dependencies {
     implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.okhttp)
+
+    // SQLCipher — crypto_database / crypto_user_database (카톡의 암호화된 DB) 를 읽는 데 쓴다.
+    // native lib 는 APK 에 함께 들어가고, app_process 환경에서는 SqlCipherNative 가 직접
+    // unzip 해서 dlopen 한다.
+    implementation(libs.sqlcipher.android)
+    implementation(libs.androidx.sqlite)
 }

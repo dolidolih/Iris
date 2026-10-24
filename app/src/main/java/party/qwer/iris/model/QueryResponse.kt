@@ -4,5 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class QueryResponse(
-    val data: List<Map<String, String?>>
+    val data: List<Map<String, String?>>,
+    val error: String? = null
 )
