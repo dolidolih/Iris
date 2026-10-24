@@ -169,6 +169,81 @@ Iris는 기본적으로 HTTP 프로토콜을 통해 정보를 주고 받습니�
     ```
 
 
+#### 조회 API 엔드포인트
+
+카카오톡 DB를 직접 조립하지 않고 방/사람/메시지를 찾기 위해 쓰는 엔드포인트들입니다. `db2`(`database_encrypted` + `db2.sqlite`)를 붙여서 읽으므로 별도 루팅 작업이 필요 없고, `db2` 의 `room`/`member` 테이블은 암호화되어 있지 않아 복호화 없이 동작합니다.
+
+*   **`/rooms` (GET)**: 최근 채팅방 목록. `?limit=`(1~100, 기본 30) 으로 건수를 조절합니다. `chat_title.title` 이 없으면 `chat_rooms.display_name` 으로 대체합니다.
+
+    ```bash
+    curl "http://[YOUR_DEVICE_IP]:[bot_http_port]/rooms?limit=10"
+    ```
+
+    **응답 (JSON):** `{ "rooms": [ { "id": Long, "name": String } ] }`
+
+*   **`/room/{roomId}` (GET)**: 방 이름. `chat_title` → `chat_rooms.display_name` 순으로 찾습니다. 없으면 `name: null`.
+*   **`/room/{roomId}/members` (GET)**: 방 구성원 (`id`, `name`, `profile_image_url`). `?limit=`(1~1000, 기본 256) 으로 방정원이 많은 계정도 넘기지 않습니다.
+*   **`/room/{roomId}/links` (GET)**: 방이 가진 링크 카드 (`id`, `url`, `image_url`, `title`, `description`, `member_limit`, `searchable`). 링크 카드가 없거나 방이 존재하지 않으면 빈 배열.
+*   **`/user/{userId}` (GET)**: 사용자 프로필 (`id`, `name`, `profile_image_url`). `users` 테이블을 먼저 보고 없으면 `friend` 에서 찾습니다.
+*   **`/user/name/{userId}` (GET)**: 표시 이름만 (`name: null` 일 수 있음).
+*   **`/chat/{roomId}/messages` (GET)**: 커서 페이지네이션 메시지 목록. `?limit=`(1~100, 기본 50), `?cursor=`(previous page의 `next_cursor`, `before_id` 로 재사용).
+
+    ```json
+    { "items": [ { "msg": "text", "room": "room name", "sender": "nickname", "json": { ...raw row... }, "extension": { ... } } ],
+      "next_cursor": Long, "has_more": true }
+    ```
+
+    `json` 은 `db2.chat_logs` 의 raw 행이고, `extension` 은 `attachment` JSON 입니다. 기본은 `json` 만 실리며 `extension` 은 `null` — `POST /config/extension` 을 `true` 로 켜면 들어옵니다.
+*   **`/chat/{logId}` (GET)**: 한 건의 메시지. `json` 필드 하나만 돌아갑니다. 없으면 `json: null`.
+*   **`/chat/{logId}/deleted` (GET)**: 삭제된 메시지 여부 (`{ "deleted": bool, "message": String }`).
+*   **`/chat/{roomId}/deleted` (GET)**: 그 방에서 삭제 표시된 메시지 목록.
+*   **`/chat/{logId}/{count}/prev` (GET)**: 이 메시지부터 앞쪽(count 건)으로 읽습니다. `/chat/123/prev/10` 처럼 씁니다.
+*   **`/reactions/{logId}` (GET)**: `reaction` 테이블 내용. 이 KakaoTalk 빌드에서는 `log_id` 가 `chat_logs._id` 기준이라 방장자 `_id` 로 조회합니다.
+*   **`/search` (POST)**: 메시지 전문 검색. `crypto_database` 의 `chat_log_search` 를 SQLCipher 로 읽습니다.
+
+    ```bash
+    curl -X POST -H "Content-Type: application/json" -d '{"query":"테스트","limit":10}' http://[YOUR_DEVICE_IP]:[bot_http_port]/search
+    ```
+
+    **응답 (JSON):** `{ "hits": [ { "id": Long, "preview": String, "room_id": Long?, "room_name": String?, "sender_id": Long?, "sender_name": String? } ] }` — `crypto_database` 접근 불가나 라이브 미적재 시 `hits: []`.
+
+#### 런타임 / 상태 API 엔드포인트
+
+*   **`/process-status` (GET)**: 데몬 전체 상태 한 방. `server_running`, `db_observing`, `port`, `bot_id`, `bot_id_resolved`(false 이면 salt 가 0 으로 굳어 자기 메시지 복호가 깨집니다), `uptime_ms`, `sqlcipher`(라이브 적재 경로/출처/암호화 DB 접근 가능 여부), `ws_subscribers`(지금 붙어있는 `/ws` 구독자 수), `logs`(데몬 로그, 최신 선행), `last_logs`(최근 수신 채팅 raw 행).
+
+    ```bash
+    curl http://[YOUR_DEVICE_IP]:[bot_http_port]/process-status
+    ```
+
+*   **`/process-command` (POST)**: `{"command": "stop"}` 또는 `{"command": "restart"}`. `stop` 은 서버 엔진까지 종료하므로 재가동에는 별도 기동이 필요합니다.
+*   **`/openapi.json` (GET)** / **`/swagger` (GET)**: OpenAPI 3.1 명세와 Swagger UI. 브라우저가 CDN 에서 UI 번들을 load 하므로 오프라인이면 `openapi.json` 링크로 대체됩니다.
+
+#### SQLCipher 암호화 DB
+
+KakaoTalk 는 이제 `crypto_database`(메시지 전문 검색 인덱스)와 `crypto_user_database`(사용자/친구 표시 이름)를 AES-256-CBC(SQLCipher) 로 암호화해 보관합니다. Iris 는 같은 SQLCipher 라이브러리를 정적 의존성으로 들고 있어서, 읽기 전용으로 열어 원문을 그대로 조회합니다.
+
+* 키는 Android Keystore `KAKAO_KEY_STORAGE`/`EC`(non-exportable EC key) 로 래핑된 `database_encrypted/kakao.db.key` 를 unwrap 하여 얻습니다. Keystore 접근은 KakaoTalk 의 uid 로 `keystore2` 를 직접 두드리는 방식이라, root 라도 shell uid 로는 실패합니다.
+* 라이브는 `libsqlcipher.so` 를 APK 에서 추출해 `/data/local/tmp/Iris.work/native/` 에 놓고 `System.load` 합니다. `app_process` 로 띄운 프로세스는 `nativeLibraryDir` 를 만들지 못하므로 `System.loadLibrary("sqlcipher")` 가 다른 앱의 라이브러리를 집어올 수 있는데, 이 경우 `/process-status` 의 `sqlcipher.foreign` 이 `true` 로 찍히고 키 오류와 구별이 불가능해집니다(그래서 `source` 필드로 출처를 먼저 나타냅니다).
+* 원문 DB 는 절대 열지 않고 `/data/local/tmp/Iris.work/` 에 owner-only 사본을 만들어 `PRAGMA query_only` 로 읽습니다. 키 풀 실패는 조용히 무시되고 관련 엔드포인트는 빈 결과를 반환합니다.
+
+*   **`/config/types` (POST)**: `/ws`·webhook 으로 내보낼 메시지 타입 필터. `types` 가 `null` 이면 기존 동작(type `1`/`2` + `attachment` 있는 case)을 유지하고, 배열을 주면 그 타입만 내보냅니다. `include_system_events` 는 type `5` 처럼 내용이 비어 있는 시스템 이벤트까지 포함할지 결정합니다.
+
+    ```json
+    { "types": [1, 2, 12], "include_system_events": false }
+    ```
+
+    ```bash
+    curl -X POST -H "Content-Type: application/json" -d '{"types":[1],"include_system_events":false}' http://[YOUR_DEVICE_IP]:[bot_http_port]/config/types
+    ```
+
+*   **`/config/extension` (POST)**: 프레임의 `extension` 필드(`attachment` JSON + 타입 분류) 포함 여부. 기본 `false`. 이 플래그는 `/ws` 와 webhook 에 **동일하게** 적용됩니다 — 켜면 webhook 페이로드에도 `extension` 키가 추가되므로, 수신측 파서가 strict 하면 미리 확인하고 켜야 합니다.
+
+    ```json
+    { "enable": true }
+    ```
+
+*   **`/config/systemevents` (POST)**: `include_system_events` 토글만 (`{"enable": true}`).
+
 #### 설정 API 엔드포인트
 
 *   **`/dashboard` (GET)**: Iris 를 설정하기 위한 웹 UI를 제공합니다. 웹 브라우저에서 이 URL을 열어 설정을 수정하세요.
@@ -196,12 +271,17 @@ Iris는 기본적으로 HTTP 프로토콜을 통해 정보를 주고 받습니�
     {
       "bot_name": "[YOUR_BOT_NAME]",
       "bot_http_port": [PORT_FOR_HTTP_SERVER],
-      "web_server_endpoint": "[YOUR_WEB_SERVER_URL_FOR_MESSAGE_FORWARDING],
+      "web_server_endpoint": "[YOUR_WEB_SERVER_URL_FOR_MESSAGE_FORWARDING]",
       "db_polling_rate": [DATABASE_POLLING_INTERVAL_IN_MILLISECONDS],
       "message_send_rate": [MESSAGE_SEND_INTERVAL_IN_MILLISECONDS],
-      "bot_id": [YOUR_KAKAO_TALK_USER_ID]
+      "bot_id": [YOUR_KAKAO_TALK_USER_ID],
+      "broadcast_types": null,
+      "include_system_events": false,
+      "enable_extension": false
     }
     ```
+
+    마지막 세 필드는 기본값과 같으면 생략됩니다(kotlinx.serialization 기본 동작).
 
 *   **`/config/endpoint` (POST)**: 메시지 전달을 위한 웹 서버 엔드포인트를 업데이트합니다.
 
@@ -306,6 +386,6 @@ This project is provided for educational and research purposes only. The develop
 This project contains a mix of MIT-licensed and GPL-licensed code.
 
 * **Original Code:** All files in this repository, unless otherwise noted, are licensed under the **MIT License**. See `LICENSE-MIT` for details.
-* **Third-Party Code:** The specific file located at `src/main/java/party/qwer/iris/NotificationPoller.kt` is partially derived from an external project and is licensed under the **GNU General Public License v3.0**. See `LICENSE-GPL` for details.
+* **Third-Party Code:** The file previously located at `src/main/java/party/qwer/iris/NotificationPoller.kt` was partially derived from an external project and was licensed under the **GNU General Public License v3.0**. That file has been removed (the notification-listener code path no longer exists); `LICENSE-GPLv3.0` is retained for reference while it was present.
 
-**Important:** Because this project compiles together with GPL v3.0 code, the final compiled application as a whole is subject to the terms of the GPL v3.0.
+**Important:** With `NotificationPoller.kt` removed, current builds no longer compile in any GPL v3.0 source, so the combined-work clause above no longer binds them. If you re-add that file (or any GPL v3.0 derived source), the whole binary again falls under GPL v3.0.
