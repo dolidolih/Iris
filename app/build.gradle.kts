@@ -86,4 +86,6 @@ dependencies {
     // unzip 해서 dlopen 한다.
     implementation(libs.sqlcipher.android)
     implementation(libs.androidx.sqlite)
+
+    testImplementation(libs.junit)
 }
