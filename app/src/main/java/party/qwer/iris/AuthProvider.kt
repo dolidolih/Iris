@@ -56,18 +56,10 @@ object AuthProvider {
 
     private fun readFiles(): Array<String> {
         val appPath = PathUtils.getAppPath()
-        val prefsFilePath = "${appPath}shared_prefs/KakaoTalk.hw.perferences.xml"
         val aotFilePath = "${appPath}aot"
 
-        val prefsFile = File(prefsFilePath)
         val aotFile = File(aotFilePath)
 
-        if (!prefsFile.exists()) {
-            throw Exception("Preferences file not found: ${prefsFile.path}")
-        }
-        if (!prefsFile.canRead()) {
-            throw Exception("Preferences file cannot be read (check permissions): ${prefsFile.path}")
-        }
         if (!aotFile.exists()) {
             throw Exception("AOT file not found: ${aotFile.path}")
         }
@@ -75,20 +67,12 @@ object AuthProvider {
             throw Exception("AOT file cannot be read (check permissions): ${aotFile.path}")
         }
 
-        val prefsContent = try {
-            prefsFile.bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
-        } catch (e: Exception) {
-            throw Exception("Failed to read preferences file: ${e.message}", e)
-        }
-
-        val regex = Regex("""<string name="d_id">\s*(.*?)\s*</string>""")
-        val matchResult = regex.find(prefsContent)
-            ?: throw Exception("Failed to find d_id pattern in preferences file content.")
-
-        val deviceId = matchResult.groupValues[1]
-        if (deviceId.isBlank()) {
-            throw Exception("Extracted d_id value is blank from preferences file.")
-        }
+        // KakaoTalk 26.10+ 는 d_id 를 DataStore 에 두고, 그 이전은 shared_prefs XML 에 둔다.
+        val deviceId = KakaoHardwarePrefs.readString(appPath, "d_id")
+            ?: throw Exception(
+                "Failed to find d_id in KakaoTalk hardware preferences: " +
+                    KakaoHardwarePrefs.describeSources(appPath)
+            )
 
         val aot = try {
             aotFile.bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
