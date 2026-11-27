@@ -6,6 +6,7 @@ ktorVersion = "3.1.1"
 okhttp = "4.10.0"
 sqlcipherAndroid = "4.13.0"
 androidxSqlite = "2.7.0"
+junit = "4.13.2"
 
 [libraries]
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
@@ -17,6 +18,7 @@ ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.re
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 sqlcipher-android = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipherAndroid" }
 androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "androidxSqlite" }
+junit = { module = "junit:junit", version.ref = "junit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

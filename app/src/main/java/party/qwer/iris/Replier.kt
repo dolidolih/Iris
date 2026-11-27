@@ -148,6 +148,17 @@ class Replier {
                 )
                 putExtra("noti_referer", referer)
                 putExtra("chat_id", chatId)
+                // KakaoTalk 26.10+ 는 로그인 계정의 user id 와 일치하는 recipient_id 가 없는
+                // 알림 답장 인텐트를 로그 없이 버린다 (#134). 구버전은 이 extra 를 무시한다.
+                val recipientId = Configurable.botId
+                if (recipientId > 0L) {
+                    putExtra("recipient_id", recipientId)
+                } else {
+                    System.err.println(
+                        "Replier: bot user id unresolved — reply sent without recipient_id " +
+                            "(KakaoTalk 26.10+ will drop it)"
+                    )
+                }
 
                 putExtra("is_chat_thread_notification", threadId != null)
                 if (threadId != null) {

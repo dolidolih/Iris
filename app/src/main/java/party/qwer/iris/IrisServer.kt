@@ -63,7 +63,6 @@ import party.qwer.iris.model.SearchHit
 import party.qwer.iris.model.SearchRequest
 import party.qwer.iris.model.SearchResponse
 import party.qwer.iris.model.SqlCipherStatus
-import java.io.File
 
 /**
  * IrisServer — `app_process` 데몬이 여는 HTTP 서버.
@@ -131,23 +130,22 @@ class IrisServer(private val kakaoDB: KakaoDB) {
         } == true
 
     /**
-     * KakaoTalk shared_prefs XML 에서 NotificationReferer 추출.
+     * KakaoTalk 설정에서 NotificationReferer 추출 — 26.10+ 는 DataStore, 그 이전은
+     * shared_prefs XML (KakaoHardwarePrefs 가 순서대로 시도한다).
      * 실패해도 답장 자체는 동작하므로 기본값으로 넘어간다.
      */
     private fun extractNotificationReferer(): String {
         try {
             val appPath = PathUtils.getAppPath()
-            val prefsFile = File("${appPath}shared_prefs/KakaoTalk.hw.perferences.xml")
-            if (prefsFile.exists() && prefsFile.canRead()) {
-                val data = prefsFile.readText()
-                val regex = Regex("""<string name="NotificationReferer">(.*?)</string>""")
-                val match = regex.find(data)
-                if (match != null && match.groups[1] != null) {
-                    val referer = match.groups[1]!!.value
-                    println("IrisServer: NotificationReferer extracted: $referer")
-                    return referer
-                }
+            val referer = KakaoHardwarePrefs.readString(appPath, "NotificationReferer")
+            if (referer != null) {
+                println("IrisServer: NotificationReferer extracted: $referer")
+                return referer
             }
+            println(
+                "IrisServer: NotificationReferer not found — " +
+                    KakaoHardwarePrefs.describeSources(appPath)
+            )
         } catch (e: Exception) {
             println("IrisServer: Failed to extract NotificationReferer: ${e.message}")
         }
